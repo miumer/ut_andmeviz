@@ -356,7 +356,7 @@ ggplot(linnad, aes(x = per_capita_inc, y = unemployment_rate, colour = bachelor 
   geom_point() + 
   scale_colour_gradientn(name = "Perc. bachelor", colours = c("yellow", "white", "red"))
 ```
-
+Kui tahame, et keskmine värv oleks 0i juures, siis tuleb limits abiga väärtused mõlemal pool nulli ühe kaugele panna
 ```{r}
 ggplot(linnad, aes(x = per_capita_inc, y = unemployment_rate, colour = bachelor - mean(bachelor))) +
   geom_point() + 
@@ -415,6 +415,16 @@ ggplot(linnad, aes(x = per_capita_inc, y = unemployment_rate, colour = birth_cla
 
 -   Mis värviskaalat on kasutatud alloleval järgneval pildil?![](images/Screenshot%202021-02-21%20at%2021.41.15.png)
 
+```{r}
+ggplot(linnad, aes(x = high_scl, y = bachelor)) + 
+  geom_point(aes(color = income_class), data = linnad %>% filter(income_class %in% c("Very Low", "Very High"))) +
+  scale_x_continuous(name  = "Higher education percentage", limits = c(0, 100), breaks = c(0, 25, 50, 75, 100), labels = c("0%", "25%", "50%", "75%", "100%")) +
+  scale_colour_brewer(aes(income_class), type = "qual", palette = 6) +
+  geom_text(aes(label = County), color = "red", hjust = 0, data = linnad %>% filter(high_scl < 50)) +
+  geom_vline(xintercept = 50)
+```
+
+
 ### Faktoritega töötamine
 
 Pakett ggplot2 üritab võimalikult palju kasutada joonistamisel informatsiooni mis on kodeeritud faktori tasemetesse. Faktor on andmetüüp diskreetsetele muutujatele, mis säilitab lisaks väärtustele ka info küigi võimalike väärtuste ning nende järjestuste kohta. Faktori taseme nimede põhjal joonistatakse näiteks legend ja taseme järjestust kasutatakse telgedel elementide järjestamiseks. Seetõttu on oluline tunda paari nippi kuidas faktorite tasemetega töötada. 
@@ -435,7 +445,6 @@ a = factor(c(1, 1, 1, 2, 2, 3), labels = c("A", "B", "C"))
 a
 
 factor(a, levels = c("B", "C", "A"))
-
 ```
 
 Seega kui me tahame mugandada pilti on tihtipeale kasulikum enne mugandada andmeid ja siis nendega pilt joonistada.
@@ -530,4 +539,26 @@ ggplot(linnad, aes(x = per_capita_inc, y = unemployment_rate, colour = Poverty_f
 
 -   Proovi joonistada võimalikult sarnane graafik järgnevaga. Siin on rakendatud terve hulk nippe. mida sai antud praksis õpitud. Punktid kujunevad selle põhjal kui palju neist nippidest on rakendatud. Näiteks kui värv pole täpselt õige, punkte maha ei võta kui õigel graafiku osal on värve siiski muudetud.
 
-![](images/Screenshot%202021-02-22%20at%2012.40.24.png)
+![](images/Screenshot 2021-02-22 at 12.40.24.png)
+
+
+
+```{r}
+ggplot(linnad, aes(x=factor(Poverty_factor, levels=c("Low", "Medium", "High")), y = govt_employed, color = unemployment_rate))+
+  geom_point(position = "jitter")+
+  ggtitle("Poverty and government as employee")+
+  xlab("Povery factor")+
+  scale_y_continuous(name = "Percentage of government employees", limits = c(0,60), breaks = c(0,20,40,60))+
+  scale_colour_gradient(name = "Unemployment rate", low = "red", high = "black", breaks = c(5, 10, 15, 20))+
+  geom_hline(yintercept = 30, linetype = "dashed") +
+  facet_wrap(~State) +
+  theme_bw()+
+  theme(legend.position = c(1,1), legend.justification = c(1, 2.2),
+        strip.background =element_rect(fill="#FFD700"))
+```
+
+```{r}
+glimpse(linnad)
+```
+
+
