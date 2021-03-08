@@ -548,12 +548,12 @@ ggplot(linnad, aes(x=factor(Poverty_factor, levels=c("Low", "Medium", "High")), 
   geom_point(position = "jitter")+
   ggtitle("Poverty and government as employee")+
   xlab("Povery factor")+
-  scale_y_continuous(name = "Percentage of government employees", limits = c(0,60), breaks = c(0,20,40,60))+
+  scale_y_continuous(name = "Percentage of government employees", limits = c(0,70), breaks = c(0,20,40,60))+
   scale_colour_gradient(name = "Unemployment rate", low = "red", high = "black", breaks = c(5, 10, 15, 20))+
   geom_hline(yintercept = 30, linetype = "dashed") +
   facet_wrap(~State) +
   theme_bw()+
-  theme(legend.position = c(1,1), legend.justification = c(1, 2.2),
+  theme(legend.position = c(1,1), legend.justification = c(1, 2.20),
         strip.background =element_rect(fill="#FFD700"))
 ```
 
