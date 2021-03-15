@@ -553,7 +553,7 @@ ggplot(linnad, aes(x=factor(Poverty_factor, levels=c("Low", "Medium", "High")), 
   geom_hline(yintercept = 30, linetype = "dashed") +
   facet_wrap(~State) +
   theme_bw()+
-  theme(legend.position = c(1,1), legend.justification = c(1, 2.20),
+  theme(legend.position = c(1,0.45), legend.justification = c(1, 1),
         strip.background =element_rect(fill="#FFD700"))
 ```
 
