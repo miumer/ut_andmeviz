@@ -385,7 +385,7 @@ popViewport()
 pushViewport(viewport(x = 0.8, y = 0.9, height = 0.75, width = 0.7, just = c(1, 1)))
 grid.points(x = eyecolor$eye_scaled, y = eyecolor$count_scaled, pch = 19, gp = gpar(col = eyecolor$gender_color))
 grid.xaxis(at = c(0.2, 0.4, 0.6, 0.8), label = c("Helepruun", "Pruun", "Roheline", "Sinine"))
-grid.yaxis(at = grid.pretty(c(0, 122)) / max(eyecolor$count), label = grid.pretty(c(0, 122)))
+grid.yaxis(at = grid.pretty(c(0, 122)) / max(eyecolor$count), label = grid.pretty(c(31, 122)))
 popViewport()
 
 # Pealkiri
@@ -446,27 +446,19 @@ popViewport()
 -   Kasutades õpitud käske joonista sama andmestik välja tulpdiagrammina. Kas tulbad on kõrvuti, üksteise otsas, jagatud tahkudeks või leitud mõni muu lahendus jääb juba enda otsustada.
 
 ```{r}
-#värvi ja sugu kombineeriv skaleerimine
-eyecolor <- eyecolor %>% 
-  mutate(col_gen_scaled = eye_scaled-(as.numeric(as.factor(gender))-1)*0.05)
-```
-
-
-```{r}
   grid.newpage()
   
   # Legend
   pushViewport(viewport(x = 0.8, y = 0, height = 1, width = 0.2, just = c(0, 0)))
-  grid.rect(x = 0.1, y = c(0.5, 0.55), height = 0.03, width = 0.1, gp = gpar(fill = unique(eyecolor$gender_color)))
-  grid.text(x = 0.35, y = c(0.5, 0.55), label = unique(eyecolor$gender))
+  grid.rect()
+  grid.text(label = "Legend")
   popViewport()
   
   # Graafik
   pushViewport(viewport(x = 0.8, y = 0.9, height = 0.75, width = 0.7, just = c(1, 1)))
-  grid.rect(x = eyecolor$col_gen_scaled, y = 0, height = eyecolor$count_scaled, width = 0.05, 
-            gp = gpar(fill = eyecolor$gender_color), just = c(0,0))
+  grid.rect(x = eyecolor$eye_scaled, y = 0, height = eyecolor$count_scaled, width = 0.1, gp = gpar(col = eyecolor$gender_color))
   grid.xaxis(at = c(0.2, 0.4, 0.6, 0.8), label = c("Helepruun", "Pruun", "Roheline", "Sinine"))
-  grid.yaxis(at = grid.pretty(c(0, 122)) / max(eyecolor$count), label = grid.pretty(c(0, 122)))
+  grid.yaxis(at = grid.pretty(c(0, 122)) / max(eyecolor$count), label = c(31, grid.pretty(c(31, 120)),122))
   popViewport()
   
   # Pealkiri
