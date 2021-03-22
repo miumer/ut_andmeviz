@@ -446,6 +446,8 @@ popViewport()
 -   Kasutades õpitud käske joonista sama andmestik välja tulpdiagrammina. Kas tulbad on kõrvuti, üksteise otsas, jagatud tahkudeks või leitud mõni muu lahendus jääb juba enda otsustada.
 
 ```{r}
+
+
   grid.newpage()
   
   # Legend

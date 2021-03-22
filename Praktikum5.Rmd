@@ -202,11 +202,13 @@ test_ann_col = data.frame(
                     CellType = factor(rep(c("CT1", "CT2"), 5)), 
                     Time = 1:5
                 )
+
 rownames(test_ann_col) = paste("Test", 1:10, sep = "")
 
 test_ann_row = data.frame(
                     GeneClass = factor(rep(c("Path1", "Path2", "Path3"), c(10, 4, 6)))
                 )
+
 rownames(test_ann_row) = paste("Gene", 1:20, sep = "")
 ```
 
@@ -460,6 +462,11 @@ Loe sisse andmestik `16PF.RData`. Maatriks `mat` sisaldab ühe isiksusetesti vas
     -   Vihje: kuna annotatsioone on palju kasuta võimalust genereerida graafiku fail, mis on suurem kui Rnotebooki graafiku aken.
 
 -   Kasutades peakomponentide analüüsi ja t-SNEd uuri kas ka nendel graafikutel tulevad välja seosed riikide ja vastuste vahel
+
+```{r}
+load("16PF.Rdata", verbose = TRUE)
+```
+
 
 -   **Boonus** (0.5 x koduülesande punktide arv)**:** Proovi luua graafik mis toob välja selgelt konkreetsete küsimuste vastamise mustri eri riikides. Et ei peaks kasutama legendi, mis sõnastus oli vaid seda saaks otse graafikult vaadata. Et oleks võimalik graafikult selgelt välja lugeda küsimuste sõnastus ja nende vastuste muster erinevatest riikidest pärit inimeste seas.
 

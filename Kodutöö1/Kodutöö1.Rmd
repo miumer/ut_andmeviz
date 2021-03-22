@@ -1,0 +1,563 @@
+---
+title: "Kodutöö 1"
+output: html_notebook
+---
+
+## Kodutöö esitamise õpetus
+
+Iga ülesande lahendus peaks mahtuma ühte või mitmesse koodiaknasse, selle ülesande all. See kood võiks olla nii kirjutatud, et saaks käima tõmmata ilma mõtlemata. See tähendab, et kõik vajalikud lisapaketid ja andmestikud loetakse sisse vastavas koodiaknas.
+
+Esita kogu kodutöö kataloog zip failina meili aadressil **raivo.kolde\@ut.ee.** Kirja pealkirjaks pane **LTAT.02.008 Kodutöö 1.** Tähtaeg on ***22. märts 23.59 EET.***
+
+## Ülesanne 1
+
+Kasutades grid paketi käske joonista `eyecolor` andmestik välja tulpdiagrammina. Kas tulbad on kõrvuti, üksteise otsas, jagatud tahkudeks või leitud mõni muu lahendus jääb juba enda otsustada.
+
+Vihje: kasuta ära võimalikult palju praktikumi koodi
+
+```{r}
+library(grid)
+library(tidyverse)
+
+eyecolor = tibble(
+  eye = c("Pruun", "Pruun", "Sinine", "Sinine", "Helepruun", "Helepruun", "Roheline", "Roheline"),
+  gender = c("Mees", "Naine", "Mees", "Naine", "Mees", "Naine", "Mees", "Naine"),
+  count = c(98, 122, 101, 114, 47, 46, 33, 31)
+)
+
+eyecolor <- eyecolor %>% 
+  mutate(eye_scaled = as.numeric(as.factor(eye))/(length(unique(eye))+1)) %>% 
+  mutate(gndr_scaled = (as.numeric(factor(gender))-1)/length(unique(gender))*0.1) %>% 
+  mutate(eye_gndr_scaled = eye_scaled+gndr_scaled) %>%
+  mutate(gender_color = hcl.colors(2)[gender %>% as.factor() %>% as.numeric()]) %>% 
+  mutate(count_scaled = count / max(count))
+                                            
+grid.newpage()
+  
+# Legend
+pushViewport(viewport(x = 0.8, y = 0, height = 1, width = 0.2, just = c(0, 0)))
+grid.rect(x = 0.025, y = 0.55, height = 0.03, width =0.1,
+          gp = gpar(col = hcl.colors(2)[2], fill = hcl.colors(2)[2]))
+grid.rect(x = 0.025, y = 0.60, height = 0.03, width =0.1,
+          gp = gpar(col = hcl.colors(2)[1], fill = hcl.colors(2)[1]))
+grid.text(label = "Naine", x = 0.25, 0.55)
+grid.text(label = "Mees", x = 0.25, 0.6)
+popViewport()
+  
+# Graafik
+pushViewport(viewport(x = 0.8, y = 0.9, height = 0.75, width = 0.7, just = c(1, 1)))
+grid.rect(x = eyecolor$eye_gndr_scaled, y = 0, just = c(1,0), height = eyecolor$count_scaled, width = 0.05, gp = gpar(col = eyecolor$gender_color, fill = eyecolor$gender_color))
+grid.xaxis(at = c(0.2, 0.4, 0.6, 0.8), label = c("Helepruun", "Pruun", "Roheline", "Sinine"))
+grid.yaxis(at = grid.pretty(c(0, 122))/ max(eyecolor$count), label = grid.pretty(c(0, 122)))
+popViewport()
+  
+# Pealkiri
+pushViewport(viewport(x = 0.8, y = 0.9, height = 0.1, width = 0.7, just = c(1, 0)))
+grid.text(x = 0, y = 0.15, label = "Statistikute silmavärv", just = c(0, 0), gp = gpar(fontsize = 20))
+popViewport()
+  
+# x - telg
+pushViewport(viewport(x = 0.8, y = 0.15, height = 0.15, width = 0.7, just = c(1, 1)))
+grid.text(x = 0.5, y = 0.1, label = "Silmavärv", just = c(0.5, 0))
+popViewport()
+  
+# y - telg
+pushViewport(viewport(x = 0, y = 0.15, height = 0.75, width = 0.1, just = c(0, 0)))
+grid.text(x = 0.2, y = 0.5, label = "Arv", just = c(0, 0.5), rot = 90)
+popViewport()
+```
+
+
+## Ülesanne 2
+
+Proovi joonistada võimalikult sarnane graafik järgnevaga, lasutades andmestikku `linnad.RData`. Siin on rakendatud terve hulk nippe. mida sai antud praksis õpitud. Punktid kujunevad selle põhjal kui palju neist nippidest on rakendatud. Kui õiget nippi on rakendatud, kuid tulemus pole täpselt identne, siis punkte maha ei võta. Näiteks kui värv pole täpselt õige aga õigel graafiku osal on seda siiski muudetud.
+
+![](images/Screenshot%202021-02-22%20at%2012.40.24-01.png)
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+
+load("linnad.RData", verbose = T)
+
+ggplot(linnad, aes(x=factor(Poverty_factor, levels=c("Low", "Medium", "High")), y = govt_employed, color = unemployment_rate))+
+  geom_point(position = "jitter")+
+  ggtitle("Poverty and government as employee")+
+  xlab("Povery factor")+
+  scale_y_continuous(name = "Percentage of government employees", limits = c(0,70), breaks = c(0,20,40,60))+
+  scale_colour_gradient(name = "Unemployment rate", low = "red", high = "black", breaks = c(5, 10, 15, 20))+
+  geom_hline(yintercept = 30, linetype = "dashed") +
+  facet_wrap(~State) +
+  theme_bw()+
+  theme(legend.position = c(1,0.45), legend.justification = c(1, 1),
+        strip.background =element_rect(fill="#FFD700"))
+```
+
+## Ülesanne 3
+
+Meil on andmestik erinevate maailma riikide ning nende sotsiaalsete indeksite kohta. See andmestik on failis `countries.RData` mis on kaasas praktikumi materjalidega. Sellel andmestikul tuleks uurida küsimust, kas ja milline on seos laste arvul naise kohta (`child_per_woman`) oodatava elueaga (`life_expectancy`). Sealjuures tuleks pildil arvesse võtta ka riikide populatsiooni (`population_total`), maailmajagu (`region`) ning jaotust sissetuleku järgi (`income_groups`). Kõik muutujad võib panna ühele pildile või võib kombineerida ka mitmest panellist patchworki kasutades. Kuna andmed on keerukad võib pildi salvestada suuremana (kasutades käsku `ggsave` ja argumente `height` ja `width`), et kõigel vajalikul piisavalt ruumi oleks.
+
+Esitada tuleb graafikut genereeriv **kood** ja ka mõne lauseline **järeldus**, mille te pildilt olete välja lugenud.
+
+Hindame järgnevaid aspekte
+
+-   Järelduse asjakohasus ja kui lihtne on seda pildiga kokku viia
+
+-   Graafiku(te) joonistamisel tehtud valikute asjakohasus
+
+-   Graafilised detailid ja nende valik
+
+    -   Värviskaalad
+
+    -   Diskreetsete muutujate järjekord
+
+    -   Kõik tekstid pildil võiksid olla kergesti loetavad (suurte tähtedega, grammatiliselt korrektsed, piisavalt kirjeldavad)
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(RColorBrewer)
+library(patchwork)
+library(sjmisc)
+
+load("countries.RData", verbose = T)
+
+#populatsioonid kvantiilide põhjal 4ks kategooriaks
+countries$pop_grouped <- split_var(countries$population_total, n = 4) 
+
+#eralduskohad
+splits <- prettyNum(quantile(countries$population_total, c(.25,.50,.75,1), names = FALSE),big.mark=",", scientific = FALSE) 
+
+#Populatsioonikategooriate nimed
+nimed <- c(paste0("0-",splits[1]),
+           paste0(splits[1],"-",splits[2]),
+           paste0(splits[2],"-",splits[3]),
+           paste0(splits[3],"-",splits[4]))
+
+countries$pop_grouped <- factor(countries$pop_grouped, labels = nimed) 
+
+#Muude tunnuse faktorite järjestus ja nimed
+countries <- countries %>% 
+  mutate(income_groups = factor(income_groups, levels = c("low_income", "lower_middle_income", 
+                                                          "upper_middle_income", "high_income"))) %>% 
+  mutate(income_groups_est = recode(income_groups,  low_income = "Madal sissetulek",  lower_middle_income = "Madal keskmine sissetulek",
+                                 upper_middle_income = "Kõrge keskmine sissetulek",  high_income = "Kõrge sissetulek")) %>% 
+  mutate(region_est = recode(region,  africa = "Aafrika",  americas = "Ameerika",
+                                 asia = "Aasia",  europe = "Euroopa"))
+
+#Üldine graafik
+general <- ggplot(countries, aes(x=child_per_woman, y = life_expectancy))+
+  geom_point(aes(shape = region_est, size = log(population_total), color = income_groups_est), alpha = 0.7)+
+  geom_smooth(method="lm")+
+  xlab(label = "Lapsi naise kohta")+
+  ylab(label = "Oodatav eluiga")+
+  scale_colour_manual(values = c("#ffffb2", "#fecc5c", "#fd8d3c", "#e31a1c"))+
+  theme(panel.background = element_rect(fill = "gray15"))+
+  theme(plot.background = element_rect(fill = "lightgray", 
+                                       colour = "gray30", 
+                                       size = 2))+
+  theme(legend.background = element_rect(fill= "lightgray"))+
+  theme(axis.text.x = element_text(face = "bold", 
+                                   color = "black", 
+                                   size = 10),
+          axis.text.y = element_text(face = "bold", 
+                                     color = "black", 
+                                     size = 10))+
+  theme(axis.title.x = element_text(face = "bold", color = "black", 
+                           size = 12),
+          axis.title.y = element_text(face = "bold", color = "black", 
+                           size = 12))+
+  theme(legend.key=element_rect(fill = "gray30"), 
+        legend.key.size = unit(2,"line"), 
+        legend.title=element_text(size=15),
+        legend.text=element_text(size=13))+
+  theme(legend.position = c(1,1), 
+        legend.justification = c(1, 1), 
+        legend.box = "horizontal")+
+  guides(shape = guide_legend(override.aes = list(size=4)))+
+  guides(colour = guide_legend(override.aes = list(size=4)))+
+  labs(color = "Sissetulek", fill = "Sissetulek", size = "log(populatsioon)", shape = "Piirkond")+
+  ggtitle(label = "Suhe laste arvu ja oodatava eluea vahel")
+
+#Sissetulekut arvestav graafik
+incm_plt <- ggplot(countries, aes(x=child_per_woman, y = life_expectancy, color = income_groups_est))+
+    geom_point(alpha = 0.7, size = 3)+
+    geom_smooth(aes(fill = income_groups_est), method="lm")+
+    xlab(label = "Lapsi naise kohta")+
+    ylab(label = "Oodatav eluiga")+
+    scale_colour_manual(values = c("#ffffb2", "#fecc5c", "#fd8d3c", "#e31a1c"))+
+    scale_fill_manual(values = c("#ffffb2", "#fecc5c", "#fd8d3c", "#e31a1c"))+
+    theme(panel.background = element_rect(fill = "gray15"))+
+    theme(plot.background = element_rect(fill = "lightgray", colour = "gray30", size = 2))+
+    theme(legend.background = element_rect(fill= "lightgray"))+
+    theme(legend.position = c(1,1), legend.justification = c(1, 1))+
+    theme(axis.text.x = element_text(face = "bold", color = "black", 
+                           size = 10),
+          axis.text.y = element_text(face = "bold", color = "black", 
+                           size = 10))+
+    theme(axis.title.x = element_text(face = "bold", color = "black", 
+                           size = 12),
+          axis.title.y = element_text(face = "bold", color = "black", 
+                           size = 12))+
+    theme(legend.key=element_rect(fill = "gray30"),
+          legend.key.size = unit(2,"line"), 
+          legend.title=element_text(size=12),
+          legend.text=element_text(size=10))+
+    guides(size=FALSE)+
+    labs(color = "Sissetulek", fill = "Sissetulek")+
+    ggtitle(label = "Suhe laste arvu ja oodatava eluea vahel \narvestades sissetulekuga")
+
+#Piirkonda arvestav graafik
+rgn_plt <- ggplot(countries, aes(x=child_per_woman, y = life_expectancy, colour = region_est))+
+    geom_point(aes(shape = region_est), alpha = 0.7, size = 4)+
+    geom_smooth(aes(fill = region_est), method="lm")+
+    xlab(label = "Lapsi naise kohta")+
+    ylab(label = "Oodatav eluiga")+
+    scale_colour_brewer(palette = "Dark2")+
+    scale_fill_brewer(palette = "Dark2")+
+    theme(panel.background = element_rect(fill = "gray15"))+
+    theme(plot.background = element_rect(fill = "lightgray", colour = "gray30", size = 2))+
+    theme(legend.background = element_rect(fill= "lightgray"))+
+    theme(legend.position = c(1,1), legend.justification = c(1, 1), legend.box = "horizontal")+
+    theme(axis.text.x = element_text(face = "bold", color = "black", 
+                           size = 10),
+          axis.text.y = element_text(face = "bold", color = "black", 
+                           size = 10))+
+    theme(axis.title.x = element_text(face = "bold", color = "black", 
+                           size = 12),
+          axis.title.y = element_text(face = "bold", color = "black", 
+                           size = 12))+
+    theme(legend.key=element_rect(fill = "gray30"),
+          legend.key.size = unit(2,"line"), 
+          legend.title=element_text(size=15),
+          legend.text=element_text(size=13))+
+    theme(legend.key.size = unit(2,"line"))+
+    labs(colour = "Piirkond", shape = "Piirkond", fill = "Piirkond")+
+    guides(size = FALSE)+
+    ggtitle(label = "Suhe laste arvu ja oodatava eluea vahel \narvestades piirkonnaga")
+
+#Populatsiooni arvestav graafik
+pop_plt <- ggplot(countries, aes(x=child_per_woman, y = life_expectancy, color = pop_grouped))+
+    geom_point(aes(size = log(population_total)), alpha = 0.7)+
+    geom_smooth(aes(fill = pop_grouped), method="lm")+
+    xlab(label = "Lapsi naise kohta")+
+    ylab(label = "Oodatav eluiga")+
+    scale_colour_manual(values = c("#ffffcc", "#a1dab4", "#41b6c4", "#225ea8"))+
+    scale_fill_manual(values = c("#ffffcc", "#a1dab4", "#41b6c4", "#225ea8"))+
+    theme(panel.background = element_rect(fill = "gray15"))+
+    theme(plot.background = element_rect(fill = "lightgray", colour = "gray30", size = 2))+
+    theme(legend.background = element_rect(fill= "lightgray"))+
+    theme(legend.position = c(1,1), legend.justification = c(1, 1), legend.box = "horizontal")+
+    theme(axis.text.x = element_text(face = "bold", color = "black", 
+                           size = 10),
+          axis.text.y = element_text(face = "bold", color = "black", 
+                           size = 10))+
+  theme(axis.title.x = element_text(face = "bold", color = "black", 
+                           size = 12),
+          axis.title.y = element_text(face = "bold", color = "black", 
+                           size = 12))+
+    theme(legend.key=element_rect(fill = "gray30"),
+          legend.key.size = unit(1,"line"), 
+          legend.title=element_text(size=12),
+          legend.text=element_text(size=10))+
+    labs(size = "log(populatsioon)", fill = "Populatsiooni vahemik", color = "Populatsiooni vahemik") +
+    ggtitle(label = "Suhe laste arvu ja oodatava eluea vahel \narvestades populatsiooniga")
+
+board <- general / (incm_plt | rgn_plt | pop_plt)
+
+ggsave("kodutoo_plot1.png", board, width = 50, height = 30, units = "cm")
+```
+
+**Järeldus: **Järelduste tegemisel eeldame lineaarset suhet laste arvu ja eluea vahel. Vaadates üldist suhet (muid tunnused pole arvesse võetud) kirjeldavat graafikut, näeme, et suhe laste arvu ja oodatava eluea vahel on negatiivne (mida suurem on laste arv, seda madalam on oodatav eluiga). Vaadates all vasakul olevat graafikut, näeme, et sissetuleku suurus omab potentsiaalselt mõju laste arvu ja oodatava eluea suhtele (vähemalt kõrgeimal tasemel), kuna suhte suund muutub märgatavalt ühel tasemel. Alumine keskmine graafik näitab, et potentsiaalselt omab mõju piirkond, kus riik asub, sest suhe laste arvu ja eluea pikkuse vahel muutub Euroopas vastupidiseks. Samas on pildilt näha, et Euroopas elavad ka kõrgeima sissetulekuga inimesed. Seega on raske eristada piirkonna (sissetulekust eraldi eksisteerivana) ja sissetuleku (piirkonnast eraldi eksisteerivana) mõju. Populatsiooni suurus ei tundu kvantiilide põhjal kategooriateks jaotatuna mõju avaldavat.
+
+## Ülesanne 4
+
+Loe sisse andmestik `16PF.RData`. Maatriks `mat` sisaldab ühe isiksusetesti vastuseid portsu inimeste kohta. Ridades on inimeste andmed ja veergudes küsimuste vastused viie punktisel skaalal. Kus 1 on "ei ole üldse nõus" ja 5 on "nõustun täielikult". Nii ridade kui veergude kohta on meil ka meta-andmed, andmetabelid `a_row` ja `a_col`. Küsimuste kohta on teada kategooria ja küsimuse tekst. Inimeste kohta teame nende päritolu riiki ja vanust.
+
+-   Joonista maatriksist `mat` soojuskaart ja proovi vaadata
+
+    -   Kas riik või vanus on seotud vastustega küsimustele?
+
+    -   Kas küsimused grupeeruvad kuidagi vastuste põhjal?
+
+    -   Vihje: kuna annotatsioone on palju kasuta võimalust genereerida graafiku fail, mis on suurem kui Rnotebooki graafiku aken.
+    
+
+-   Kasutades peakomponentide analüüsi ja t-SNEd uuri kas ka nendel graafikutel tulevad välja seosed riikide ja vastuste vahel
+
+-   **Boonus** (0.5 x koduülesande punktide arv)**:** Proovi luua graafik mis toob välja selgelt konkreetsete küsimuste vastamise mustri eri riikides. Et oleks võimalik graafikult selgelt välja lugeda küsimuste sõnastus ja nende vastuste muster erinevatest riikidest pärit inimeste seas.
+
+Tulemuste puhul hindan nii sisu, et on joonistatud adekvaatne graafik, kui ka vormi, et graafik oleks selgelt loetav ja seal ei oleks midagi liigset mida pole kas vaja või pole võimalik välja lugeda.
+
+```{r}
+library(tidyverse)
+library(pheatmap)
+
+load("16PF.Rdata", verbose = TRUE)
+
+a_row_cnt_age <- a_row %>%
+  mutate(Country = factor(a_row$Country, levels = c("AU", "GB", "IN", "PH", "PK", "US"))) %>% 
+  filter(Age != 211) %>% 
+  arrange(Country, Age)
+
+a_col_warm <- a_col %>% 
+  select(QuestionGroupName) %>% 
+  mutate(QuestionGroupName = factor(QuestionGroupName))
+
+row.names(a_col_warm) <- a_col$Question
+colnames(mat) <- a_col$Question
+  
+ann_cols = list(Age = c("white", "firebrick"),
+                Country = c(AU = "#E41A1C",
+                            GB = "#377EB8",
+                            IN = "#4DAF4A",
+                            PH = "#984EA3",
+                            PK = "#FF7F00",
+                            US = "#FFFF33"),
+                QuestionGroupName = c(`Emotional Stability` = "#1B9E77",
+                                      `Rule-Consciousness` = "#E7298A",
+                                      Sensitivity = "#E6AB02",
+                                      Vigilance = "#666666",
+                                      Warmth = "#D95F02"))
+                
+pheatmap(t(mat[rownames(a_row_cnt_age),]),
+         main = "Personality test heatmap",
+         show_colnames = F, 
+         cluster_cols = F,
+         annotation_col = a_row_cnt_age,
+         annotation_row = a_col_warm,
+         annotation_names_row = F,
+         clustering_distance_col = "euclidean", 
+         clustering_method = "ward.D2",
+         cellheight = 8,
+         cellwidth = 0.7,
+         filename = "kodutoo_heat.png",
+         height = 8,
+         width = 13,
+         cutree_row = 3,
+         color = colorRampPalette(c("#ffffcc", "#41b6c4", "#225ea8"))(99),
+         annotation_colors = ann_cols)
+
+brewer.pal(8, "Dark2")
+```
+
+Vaadates esimest soojuskaarti on näha, et klasterdamisel tekib kaks gruppi. Küsimusi vaadates tuleb see sellest, et küsimused on vomistatud nendes gruppides vastupidiselt. Esimeses (soojuskaardil ülemises) grupis saavad kõrgema skoori "positiivsemaid" isiksuseomadusi kirjeldavad küsimused ja teises grupis "negatiivsemaid" isiksuseomadusi kirjeldavad küsimused. Suurte gruppide siseselt on näha "negatiivse" grupi puhul veel eriti madalate skooridega küsimuste grupi eristumist alagrupiks, mille moodustavad suuremas osas "Emotional Stability" küsimused. Riikide erinevusi vaadates, on näha, et IN ja PH saavad natuke kõrgemaid skoore selles negatiivse suunaga küsimuste emotsionaalse stabiilsuse küsimuste alagrupis, kui teised riigid. Riigi ja vanuse interkatsiooni on näha näiteks sellest, et selles samas küsimuste grupis tunduvad AU skoorid vanuse tõustes langevat. Laias laastus tundub AU puhul vanuse effekt sama olevat ka teiste "negatiivse suunaga" küsimuste puhul (rohkem vigilance ja warmth küsimuste alagrupis). Vastupidine effekt on vanusel AU riigi puhul "positiivse suunitlusega" küsimuste grupi warmth alagrupis. Sisulist grupeerimist oleks võibolla parem vaadata, kui ühe suure grupi skaalad ümber pöörata. Lühidalt sellest järgnevalt.
+
+
+```{r}
+library(tidyverse)
+library(pheatmap)
+
+load("16PF.Rdata", verbose = TRUE)
+
+a_row_cnt_age <- a_row %>%
+  filter(Age != 211) %>% 
+  arrange(Country, Age)
+
+a_col_warm <- a_col %>% 
+  select(QuestionGroupName)
+
+mat2 <- as.data.frame(mat) %>% 
+  mutate_at(vars(A8:A10), funs(recode(.,"1"=5, "2"=4, "3"=3, "4"=2, "5"=1))) %>% 
+  mutate_at(vars(C6:C10), funs(recode(.,"1"=5, "2"=4, "3"=3, "4"=2, "5"=1))) %>% 
+  mutate_at(vars(G6:G10), funs(recode(.,"1"=5, "2"=4, "3"=3, "4"=2, "5"=1))) %>% 
+  mutate_at(vars(I1:I6), funs(recode(.,"1"=5, "2"=4, "3"=3, "4"=2, "5"=1))) %>% 
+  mutate_at(vars(L1:L7), funs(recode(.,"1"=5, "2"=4, "3"=3, "4"=2, "5"=1)))
+
+row.names(a_col_warm) <- a_col$Question
+colnames(mat) <- a_col$Question
+
+mat2 <- as.matrix(mat2)
+
+colnames(mat2) <- a_col$Question
+
+ann_cols = list(Age = c("white", "firebrick"),
+                Country = c(AU = "#E41A1C",
+                            GB = "#377EB8",
+                            IN = "#4DAF4A",
+                            PH = "#984EA3",
+                            PK = "#FF7F00",
+                            US = "#FFFF33"),
+                QuestionGroupName = c(`Emotional Stability` = "#1B9E77",
+                                      `Rule-Consciousness` = "#E7298A",
+                                      Sensitivity = "#E6AB02",
+                                      Vigilance = "#666666",
+                                      Warmth = "#D95F02"))
+                
+pheatmap(t(mat2[rownames(a_row_cnt_age),]),
+         main = "Personality test heatmap",
+         show_colnames = F, 
+         cluster_cols = F,
+         annotation_col = a_row_cnt_age,
+         annotation_row = a_col_warm,
+         annotation_names_row = F,
+         clustering_distance_col = "euclidean", 
+         clustering_method = "ward.D2",
+         cellheight = 8,
+         cellwidth = 0.7,
+         filename = "kodutoo_heat2.png",
+         height = 8,
+         width = 13,
+         cutree_row = 5,
+         color = colorRampPalette(c("#ffffcc", "#41b6c4", "#225ea8"))(99),
+         annotation_colors = ann_cols,
+         border_color = black)
+```
+Siit näeme, et küsimused grupeeruvad üsna selgelt (üksikute erisustega) "QuestionGroupName" tunnuse järgi. Siin on selgemalt näha vanuse effekti riigi AU puhul Emotional Stability, Warmth ja Vigilance küsimuste gruppides.
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(GGally)
+
+load("16PF.Rdata", verbose = TRUE)
+
+pca1 <- prcomp(mat)
+
+d_sdev = tibble(
+  PC = 1:length(pca1$sdev),
+  SDev = pca1$sdev,
+  Variation = pca1$sdev ** 2
+)
+
+ggplot(d_sdev, aes(x = PC, y = Variation)) + 
+  geom_bar(stat = "identity")
+
+a_idrow = a_row %>% 
+  rownames_to_column("Id")
+
+pca_df = bind_cols(a_idrow, as_tibble(pca1$x[a_idrow$Id, ])) %>% 
+  select("Country", 4:10)
+
+ggpairs(pca_df, aes(color = Country), title = "Countries and personality PCA",
+        columns =  1:3, legend = c(1,1), showStrips = TRUE,
+        upper = list(combo = wrap("box_no_facet", color = "gray70"),
+                     continuous = function(data, mapping, ...){
+                       ggally_cor(data=data, mapping = mapping, size = 4,justify_labels = "left")+theme(panel.grid.major=element_blank())
+                     }),
+        diag = list(discrete="barDiag", 
+                    continuous = wrap("densityDiag", alpha=0.5)),
+        lower= list(discrete = "blank",
+                    continuous = wrap("points", size = 0.5),
+                    combo="blank"))+
+  scale_color_brewer(palette = "Set1")+
+  scale_fill_brewer(palette = "Set1")+
+  theme(panel.background = element_rect(fill = "gray15"))+
+  theme(plot.background = element_rect(fill = "lightgray", colour = "gray30", size = 2))+
+  theme(legend.background = element_rect(fill= "lightgray"))+
+  theme(axis.text.x = element_text(face = "bold", color = "black", 
+                           size = 10),
+          axis.text.y = element_text(face = "bold", color = "black", 
+                           size = 10))+
+  theme(panel.grid.major = element_blank())+
+  theme(
+   strip.background = element_rect(
+     color="black", fill="white", size=1.5, linetype="solid"))
+```
+Scree-plotist näeme, et esimesed kaks komponenti seletavad üsna suure osa variatsioonist. Samale viitab ka ggpairs plot, kus ainult esimese peakomponendi puhul on näha selgemat riikide eristumist. Täpsemalt on näha, et US ja GB (mis kattuvad peaaegu üks-ühele) eristuvad IN-st ja PH-st. Mediaani poolest erinevad GB ja US ka PK-st, kuid PK jaotus on väga laili venitatud ning seega tugevat eristumist raskem väita. Samuti on näha, et esimese ja teise komponendi skooride vaheline suhe on US puhul positiivne (PC1 tõustes tõuseb ka PC2) kuid teiste riikide puhul negatiivne. Huvitav, et vastupidine on suhe ka GB ja AU-ga võrreldes. Järgnevalt oleks mõistlik vaadata, kuidas küsimused (või küsimuste grupid) kaardistuvad nendele telgedele, et saada sisulisemat sissevaadet, mida need teljed (või kõige informatiivsem esimene telg) ikkagi esindavad. 
+
+```{r}
+set.seed(2)
+
+library(Rtsne)
+library(tidyverse)
+library(ggplot2)
+
+load("16PF.Rdata", verbose = TRUE)
+
+tsne = Rtsne(mat, perplexity = 30)
+
+d_tsne = tsne$Y
+rownames(d_tsne) = rownames(mat)
+colnames(d_tsne) = c("Component1", "Component2")
+
+d_idrow2 = a_row %>% 
+  rownames_to_column("Id") %>% 
+  select(1:2)
+
+tsne_df = bind_cols(d_idrow2, as_tibble(d_tsne[d_idrow2$Id, ])) 
+
+ggplot(tsne_df, aes(x = Component1, y = Component2, color = Country, shape = Country)) + 
+  geom_point()+
+  ggtitle(label = "Countries and personality t-sne")+
+  scale_color_brewer(type="qual", palette = "Set1")+
+  theme(panel.background = element_rect(fill = "gray15"))+
+  theme(plot.background = element_rect(fill = "lightgray", colour = "gray30", size = 2))+
+  theme(legend.background = element_rect(fill= "lightgray"))+
+  theme(axis.text.x = element_text(face = "bold", color = "black", 
+                           size = 10),
+          axis.text.y = element_text(face = "bold", color = "black", 
+                           size = 10))+
+    theme(axis.title.x = element_text(face = "bold", color = "black", 
+                           size = 12),
+          axis.title.y = element_text(face = "bold", color = "black", 
+                           size = 12))
+```
+Kuigi pilt muutub igal t-sne jooksutamisel, on alati näha PH ja natuke vähem üheselt selgelt ka IN eraldi grupeerumist US-ist, mis kinnitab ka eelnevate meetodite leidusid. Samuti on alati näha, et AU puhul moodustub 2 üksteisest selgelt eraldi olevat gruppi.
+
+## Ülesanne 5
+
+Failis `spotify_foreign.RData` on samasugused andmed aga välisartistide kohta. Proovi sealt välja tuua mõni sinu arvates huvitav seos ühe visualisatsiooniga. Esitada tuleks nii graafi genereeriv kood kui ka selgitus, mida te pildilt välja lugesite. Pildi puhul hindan, milliseid võtteid te olete kasutanud pildi ettevalmistamisel, kasutatud võiks olla vähemalt üks element kõigest järgnevast.
+
+-   On leitud sobiv punktide paigutus
+
+-   On muudetud tippude graafilisi omadusi
+
+-   On muudetud servade graafilisi omadusi
+
+-   On näidatud ära huvipakkuvamad tipud nime või mõne muu tekstiga
+
+-   On kasutatud graafi algoritme, andmete eeltöötluseks või graafiliste elementide lisamiseks
+
+Lisaks tehnilisele poolele hindan järelduse ja graafiku kokkulangevust ning graafiku visuaalset vormistust.
+
+```{r}
+library(tidyverse)
+library(tidygraph)
+library(ggraph)
+library(igraph)
+
+load("spotify_foreign.RData", verbose = T)
+
+edges_foreign = edges_foreign %>%
+  rename(from = ArtistName1, to = ArtistName2)
+
+g = tbl_graph(nodes = nodes_foreign, edges = edges_foreign, node_key = "ArtistName", directed = F)
+
+net <- g %>%
+    activate(edges) %>% 
+    mutate(`Edge Centrality` = centrality_edge_betweenness()) %>% 
+    activate(nodes) %>% 
+    filter(ArtistGenre == "hip-hop") %>% 
+    mutate(CC = group_components()) %>% 
+    filter(CC==1) %>% 
+    filter(!node_is_isolated()) %>%
+    mutate(`Louvain Grouping` = as.factor(group_louvain())) %>%
+    mutate(`Node Betweenness` = centrality_betweenness(weights = nTracks, directed = FALSE)) %>%
+    ggraph(layout = "kk") +
+    geom_edge_link(aes(width = nTracks, color = `Edge Centrality`))+
+    geom_node_point(aes(fill = `Louvain Grouping`, size = `Node Betweenness`, alpha = ArtistPopularity), shape = 21)+
+    geom_node_label(aes(label = ArtistName, fill = `Louvain Grouping`, alpha = ArtistPopularity), repel = T, color = "white", show.legend = c(alpha = F))+
+    scale_edge_color_gradientn(colors = c(low = "white", mid = "red", high = "blue"))+
+    scale_fill_brewer(type="qual", palette = "Set1")+
+    theme(panel.background = element_rect(fill = "black"))+
+    theme(plot.background = element_rect(fill = "lightgray", colour = "gray30", size = 2))+
+    theme(legend.background = element_rect(fill= "black", colour = "white"),
+          legend.box = "vertical", legend.text = element_text(color = "white"), 
+          legend.title = element_text(color="white"),
+          legend.key=element_rect(fill = "white"))+
+    theme(axis.text.x = element_blank(),
+            axis.text.y = element_blank())+
+      theme(axis.title.x = element_blank(),
+            axis.title.y = element_blank())+
+    scale_size(range = c(3,8))+
+    scale_edge_width(range = c(1, 3))+
+    scale_alpha(range= c(0.3,1))+
+    guides(fill=guide_legend(ncol=3), alpha = guide_legend(ncol=2), size = guide_legend(ncol=3))+
+  theme(legend.position = c(0.95,0.6), legend.justification = c(1, 1))
+  
+  
+ggsave("kodutoo_network1.png", net, width = 50, height = 30, units = "cm")
+```
+
+**Järeldus:**

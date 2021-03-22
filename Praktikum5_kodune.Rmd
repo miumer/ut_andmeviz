@@ -1,0 +1,57 @@
+---
+title: "Prax5_kodutöö"
+author: "Siim"
+date: "3/16/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Koduülesanne 
+
+Loe sisse andmestik `16PF.RData`. Maatriks `mat` sisaldab ühe isiksusetesti vastuseid portsu inimeste kohta. Ridades on inimeste andmed ja veergudes küsimuste vastused viie punktisel skaalal. Kus 1 on "ei ole üldse nõus" ja 5 on "nõustun täielikult". Nii ridade kui veergude kohta on meil ka meta-andmed, andmetabelid `a_row` ja `a_col`. Küsimuste kohta on teada kategooria ja küsimuse tekst. Inimeste kohta teame nende päritolu riiki ja vanust.
+
+-   Joonista maatriksist `mat` soojuskaart ja proovi vaadata
+
+    -   Kas riik või vanus on seotud vastustega küsimustele?
+
+    -   Kas küsimused grupeeruvad kuidagi vastuste põhjal?
+
+    -   Vihje: kuna annotatsioone on palju kasuta võimalust genereerida graafiku fail, mis on suurem kui Rnotebooki graafiku aken.
+
+-   Kasutades peakomponentide analüüsi ja t-SNEd uuri kas ka nendel graafikutel tulevad välja seosed riikide ja vastuste vahel
+
+```{r}
+load("16PF.Rdata", verbose = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(ggplotify)
+library(pheatmap)
+library(patchwork)
+
+pheatmap(mat, show_rownames = F, cluster_rows = F)
+
+a_row_cnt_age <- a_row %>%
+  filter(Age != 211) %>% 
+  arrange(Country, Age)
+
+
+pheatmap(mat[rownames(a_row_cnt_age),], 
+         show_rownames = F, 
+         cluster_rows=F,
+         annotation_row = a_row_cnt_age,
+         clustering_distance_rows = "euclidian", 
+         clustering_method = "ward.D2")
+```
+Vaadates soojuskaarte, näeme, et eukleidilist kaugusmõõtu kasutades Wardi algoritmiga (mis selle kauguse ruutu võtab), eristub kaks selget küsimuste gruppi. 
+
+-   **Boonus** (0.5 x koduülesande punktide arv)**:** Proovi luua graafik mis toob välja selgelt konkreetsete küsimuste vastamise mustri eri riikides. Et ei peaks kasutama legendi, mis sõnastus oli vaid seda saaks otse graafikult vaadata. Et oleks võimalik graafikult selgelt välja lugeda küsimuste sõnastus ja nende vastuste muster erinevatest riikidest pärit inimeste seas.
+
+Tulemuste puhul hindan nii sisu, et on joonistatud adekvaatne graafik, kui ka vormi, et graafik oleks selgelt loetav ja seal ei oleks midagi liigset mida pole kas vaja või pole võimalik välja lugeda.
+
+
