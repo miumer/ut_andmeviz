@@ -1,6 +1,8 @@
 ---
 title: "Kodutöö 1"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 ## Kodutöö esitamise õpetus
@@ -265,7 +267,7 @@ pop_plt <- ggplot(countries, aes(x=child_per_woman, y = life_expectancy, color =
 
 board <- general / (incm_plt | rgn_plt | pop_plt)
 
-ggsave("kodutoo_plot1.png", board, width = 50, height = 30, units = "cm")
+ggsave("kodutoo_regression.png", board, width = 50, height = 30, units = "cm")
 ```
 
 **Järeldus: **Järelduste tegemisel eeldame lineaarset suhet laste arvu ja eluea vahel. Vaadates üldist suhet (muid tunnused pole arvesse võetud) kirjeldavat graafikut, näeme, et suhe laste arvu ja oodatava eluea vahel on negatiivne (mida suurem on laste arv, seda madalam on oodatav eluiga). Vaadates all vasakul olevat graafikut, näeme, et sissetuleku suurus omab potentsiaalselt mõju laste arvu ja oodatava eluea suhtele (vähemalt kõrgeimal tasemel), kuna suhte suund muutub märgatavalt ühel tasemel. Alumine keskmine graafik näitab, et potentsiaalselt omab mõju piirkond, kus riik asub, sest suhe laste arvu ja eluea pikkuse vahel muutub Euroopas vastupidiseks. Samas on pildilt näha, et Euroopas elavad ka kõrgeima sissetulekuga inimesed. Seega on raske eristada piirkonna (sissetulekust eraldi eksisteerivana) ja sissetuleku (piirkonnast eraldi eksisteerivana) mõju. Populatsiooni suurus ei tundu kvantiilide põhjal kategooriateks jaotatuna mõju avaldavat.
@@ -293,12 +295,17 @@ Tulemuste puhul hindan nii sisu, et on joonistatud adekvaatne graafik, kui ka vo
 library(tidyverse)
 library(pheatmap)
 
-load("16PF.Rdata", verbose = TRUE)
+load("16PF.RData", verbose = TRUE)
 
 a_row_cnt_age <- a_row %>%
+  rownames_to_column() %>% 
   mutate(Country = factor(a_row$Country, levels = c("AU", "GB", "IN", "PH", "PK", "US"))) %>% 
   filter(Age != 211) %>% 
   arrange(Country, Age)
+
+a_row_cnt_age <- a_row_cnt_age %>% 
+  as.data.frame() %>% 
+  column_to_rownames("rowname")
 
 a_col_warm <- a_col %>% 
   select(QuestionGroupName) %>% 
@@ -337,8 +344,6 @@ pheatmap(t(mat[rownames(a_row_cnt_age),]),
          cutree_row = 3,
          color = colorRampPalette(c("#ffffcc", "#41b6c4", "#225ea8"))(99),
          annotation_colors = ann_cols)
-
-brewer.pal(8, "Dark2")
 ```
 
 Vaadates esimest soojuskaarti on näha, et klasterdamisel tekib kaks gruppi. Küsimusi vaadates tuleb see sellest, et küsimused on vomistatud nendes gruppides vastupidiselt. Esimeses (soojuskaardil ülemises) grupis saavad kõrgema skoori "positiivsemaid" isiksuseomadusi kirjeldavad küsimused ja teises grupis "negatiivsemaid" isiksuseomadusi kirjeldavad küsimused. Suurte gruppide siseselt on näha "negatiivse" grupi puhul veel eriti madalate skooridega küsimuste grupi eristumist alagrupiks, mille moodustavad suuremas osas "Emotional Stability" küsimused. Riikide erinevusi vaadates, on näha, et IN ja PH saavad natuke kõrgemaid skoore selles negatiivse suunaga küsimuste emotsionaalse stabiilsuse küsimuste alagrupis, kui teised riigid. Riigi ja vanuse interkatsiooni on näha näiteks sellest, et selles samas küsimuste grupis tunduvad AU skoorid vanuse tõustes langevat. Laias laastus tundub AU puhul vanuse effekt sama olevat ka teiste "negatiivse suunaga" küsimuste puhul (rohkem vigilance ja warmth küsimuste alagrupis). Vastupidine effekt on vanusel AU riigi puhul "positiivse suunitlusega" küsimuste grupi warmth alagrupis. Sisulist grupeerimist oleks võibolla parem vaadata, kui ühe suure grupi skaalad ümber pöörata. Lühidalt sellest järgnevalt.
@@ -348,24 +353,34 @@ Vaadates esimest soojuskaarti on näha, et klasterdamisel tekib kaks gruppi. Kü
 library(tidyverse)
 library(pheatmap)
 
-load("16PF.Rdata", verbose = TRUE)
+load("16PF.RData", verbose = TRUE)
 
 a_row_cnt_age <- a_row %>%
+  rownames_to_column() %>% 
+  mutate(Country = factor(a_row$Country, levels = c("AU", "GB", "IN", "PH", "PK", "US"))) %>% 
   filter(Age != 211) %>% 
   arrange(Country, Age)
+
+a_row_cnt_age <- a_row_cnt_age %>% 
+  as.data.frame() %>% 
+  column_to_rownames("rowname")
 
 a_col_warm <- a_col %>% 
   select(QuestionGroupName)
 
-mat2 <- as.data.frame(mat) %>% 
+mat2 <- as.data.frame(mat) %>%
+  rownames_to_column() %>%
+  filter(rowname != "P30039") %>% 
   mutate_at(vars(A8:A10), funs(recode(.,"1"=5, "2"=4, "3"=3, "4"=2, "5"=1))) %>% 
   mutate_at(vars(C6:C10), funs(recode(.,"1"=5, "2"=4, "3"=3, "4"=2, "5"=1))) %>% 
   mutate_at(vars(G6:G10), funs(recode(.,"1"=5, "2"=4, "3"=3, "4"=2, "5"=1))) %>% 
   mutate_at(vars(I1:I6), funs(recode(.,"1"=5, "2"=4, "3"=3, "4"=2, "5"=1))) %>% 
-  mutate_at(vars(L1:L7), funs(recode(.,"1"=5, "2"=4, "3"=3, "4"=2, "5"=1)))
+  mutate_at(vars(L1:L7), funs(recode(.,"1"=5, "2"=4, "3"=3, "4"=2, "5"=1))) %>% 
+  column_to_rownames("rowname") %>% 
+  as.data.frame()
 
 row.names(a_col_warm) <- a_col$Question
-colnames(mat) <- a_col$Question
+colnames(mat2) <- a_col$Question
 
 mat2 <- as.matrix(mat2)
 
@@ -383,6 +398,7 @@ ann_cols = list(Age = c("white", "firebrick"),
                                       Sensitivity = "#E6AB02",
                                       Vigilance = "#666666",
                                       Warmth = "#D95F02"))
+
                 
 pheatmap(t(mat2[rownames(a_row_cnt_age),]),
          main = "Personality test heatmap",
@@ -410,7 +426,7 @@ library(ggplot2)
 library(tidyverse)
 library(GGally)
 
-load("16PF.Rdata", verbose = TRUE)
+load("16PF.RData", verbose = TRUE)
 
 pca1 <- prcomp(mat)
 
@@ -429,7 +445,7 @@ a_idrow = a_row %>%
 pca_df = bind_cols(a_idrow, as_tibble(pca1$x[a_idrow$Id, ])) %>% 
   select("Country", 4:10)
 
-ggpairs(pca_df, aes(color = Country), title = "Countries and personality PCA",
+pairs <- ggpairs(pca_df, aes(color = Country), title = "Countries and personality PCA",
         columns =  1:3, legend = c(1,1), showStrips = TRUE,
         upper = list(combo = wrap("box_no_facet", color = "gray70"),
                      continuous = function(data, mapping, ...){
@@ -443,8 +459,9 @@ ggpairs(pca_df, aes(color = Country), title = "Countries and personality PCA",
   scale_color_brewer(palette = "Set1")+
   scale_fill_brewer(palette = "Set1")+
   theme(panel.background = element_rect(fill = "gray15"))+
-  theme(plot.background = element_rect(fill = "lightgray", colour = "gray30", size = 2))+
-  theme(legend.background = element_rect(fill= "lightgray"))+
+  theme(plot.background = element_rect(fill = "#EBEADC", colour = "gray30", size = 2))+
+  theme(legend.background = element_rect(fill= "gray15"),legend.text = element_text(color = "white", size = 12), 
+          legend.title = element_text(color="white", size = 13))+
   theme(axis.text.x = element_text(face = "bold", color = "black", 
                            size = 10),
           axis.text.y = element_text(face = "bold", color = "black", 
@@ -453,6 +470,12 @@ ggpairs(pca_df, aes(color = Country), title = "Countries and personality PCA",
   theme(
    strip.background = element_rect(
      color="black", fill="white", size=1.5, linetype="solid"))
+
+pairs
+
+ggsave("kodutoo_PCA_pairs.png", pairs, width = 30, height =25, units = "cm")
+
+
 ```
 Scree-plotist näeme, et esimesed kaks komponenti seletavad üsna suure osa variatsioonist. Samale viitab ka ggpairs plot, kus ainult esimese peakomponendi puhul on näha selgemat riikide eristumist. Täpsemalt on näha, et US ja GB (mis kattuvad peaaegu üks-ühele) eristuvad IN-st ja PH-st. Mediaani poolest erinevad GB ja US ka PK-st, kuid PK jaotus on väga laili venitatud ning seega tugevat eristumist raskem väita. Samuti on näha, et esimese ja teise komponendi skooride vaheline suhe on US puhul positiivne (PC1 tõustes tõuseb ka PC2) kuid teiste riikide puhul negatiivne. Huvitav, et vastupidine on suhe ka GB ja AU-ga võrreldes. Järgnevalt oleks mõistlik vaadata, kuidas küsimused (või küsimuste grupid) kaardistuvad nendele telgedele, et saada sisulisemat sissevaadet, mida need teljed (või kõige informatiivsem esimene telg) ikkagi esindavad. 
 
@@ -463,7 +486,7 @@ library(Rtsne)
 library(tidyverse)
 library(ggplot2)
 
-load("16PF.Rdata", verbose = TRUE)
+load("16PF.RData", verbose = TRUE)
 
 tsne = Rtsne(mat, perplexity = 30)
 
@@ -477,13 +500,14 @@ d_idrow2 = a_row %>%
 
 tsne_df = bind_cols(d_idrow2, as_tibble(d_tsne[d_idrow2$Id, ])) 
 
-ggplot(tsne_df, aes(x = Component1, y = Component2, color = Country, shape = Country)) + 
+tsne_plot <- ggplot(tsne_df, aes(x = Component1, y = Component2, color = Country, shape = Country)) + 
   geom_point()+
   ggtitle(label = "Countries and personality t-sne")+
   scale_color_brewer(type="qual", palette = "Set1")+
   theme(panel.background = element_rect(fill = "gray15"))+
-  theme(plot.background = element_rect(fill = "lightgray", colour = "gray30", size = 2))+
-  theme(legend.background = element_rect(fill= "lightgray"))+
+  theme(plot.background = element_rect(fill = "#EBEADC", colour = "gray30", size = 2))+
+  theme(legend.background = element_rect(fill= "lightgray"),
+        legend.key=element_rect(fill = "gray30"))+
   theme(axis.text.x = element_text(face = "bold", color = "black", 
                            size = 10),
           axis.text.y = element_text(face = "bold", color = "black", 
@@ -492,6 +516,10 @@ ggplot(tsne_df, aes(x = Component1, y = Component2, color = Country, shape = Cou
                            size = 12),
           axis.title.y = element_text(face = "bold", color = "black", 
                            size = 12))
+tsne_plot
+
+ggsave("tsne_plot.png", tsne_plot, width = 25, height = 25, units = "cm")
+
 ```
 Kuigi pilt muutub igal t-sne jooksutamisel, on alati näha PH ja natuke vähem üheselt selgelt ka IN eraldi grupeerumist US-ist, mis kinnitab ka eelnevate meetodite leidusid. Samuti on alati näha, et AU puhul moodustub 2 üksteisest selgelt eraldi olevat gruppi.
 
@@ -533,19 +561,20 @@ net <- g %>%
     filter(CC==1) %>% 
     filter(!node_is_isolated()) %>%
     mutate(`Louvain Grouping` = as.factor(group_louvain())) %>%
-    mutate(`Node Betweenness` = centrality_betweenness(weights = nTracks, directed = FALSE)) %>%
+    mutate(`Node Centrality Betweenness` = centrality_betweenness(weights = nTracks, directed = FALSE)) %>%
     ggraph(layout = "kk") +
     geom_edge_link(aes(width = nTracks, color = `Edge Centrality`))+
-    geom_node_point(aes(fill = `Louvain Grouping`, size = `Node Betweenness`, alpha = ArtistPopularity), shape = 21)+
+    geom_node_point(aes(fill = `Louvain Grouping`, size = `Node Centrality Betweenness`, alpha = ArtistPopularity), shape = 21)+
     geom_node_label(aes(label = ArtistName, fill = `Louvain Grouping`, alpha = ArtistPopularity), repel = T, color = "white", show.legend = c(alpha = F))+
     scale_edge_color_gradientn(colors = c(low = "white", mid = "red", high = "blue"))+
     scale_fill_brewer(type="qual", palette = "Set1")+
     theme(panel.background = element_rect(fill = "black"))+
     theme(plot.background = element_rect(fill = "lightgray", colour = "gray30", size = 2))+
-    theme(legend.background = element_rect(fill= "black", colour = "white"),
-          legend.box = "vertical", legend.text = element_text(color = "white"), 
-          legend.title = element_text(color="white"),
-          legend.key=element_rect(fill = "white"))+
+    theme(legend.background = element_rect(fill= "black", colour = "#D100FF", linetype = "dashed"),
+          legend.box = "horizontal", legend.text = element_text(color = "white", size = 12), 
+          legend.title = element_text(color="white", size = 13),
+          legend.key=element_rect(fill = "#FEF8C0"),
+          legend.position = c(0.45,0.97), legend.justification = c(1, 1))+
     theme(axis.text.x = element_blank(),
             axis.text.y = element_blank())+
       theme(axis.title.x = element_blank(),
@@ -553,11 +582,15 @@ net <- g %>%
     scale_size(range = c(3,8))+
     scale_edge_width(range = c(1, 3))+
     scale_alpha(range= c(0.3,1))+
-    guides(fill=guide_legend(ncol=3), alpha = guide_legend(ncol=2), size = guide_legend(ncol=3))+
-  theme(legend.position = c(0.95,0.6), legend.justification = c(1, 1))
-  
+    guides(fill=guide_legend(ncol=3), alpha = guide_legend(ncol=2, title = "Artist Popularity"), size = guide_legend(ncol=3))
   
 ggsave("kodutoo_network1.png", net, width = 50, height = 30, units = "cm")
 ```
 
 **Järeldus:**
+
+Võrgustikku vaadates näeme, et Louvaine klasterdamise tulemusel eristub 9 gruppi hip-hop artiste. See, millistel põhjustel just need artistid rohkem ühendatud on jääb küll väljapoole antud töö ulatust. Vaadates võrgustikku on näha, et kõigis nendes gruppides on teatud artistid, kes on populaarsemad kui teised (Eminem, Juice WRLD, Young Thug, Polo G, Drake, Post Malone, Roddy Ricch jne) ja tihti on üks nendest populaarseimatest artistidest ka kõrgeima betweeness centralityga (kuid populaarsus ei tähenda alati kõrget centralityt), mis mõõdab seda, kui palju ta on artistide (ja gruppide) seoste vahendajaks. Nimetatud artistid on võrgustikus ka peamiseks ühenduseks erinevate gruppide vahel ning nendega on tihti ühendatud ka kõige suurema tsentraalsusmõõduga servad. Kuid mitte alati (nt Drake'i puhul). 
+
+On näha, et Juice Wrld on punases grupis üks populaarsemaid artiste ja tema tsentraalsusmõõt on suurim. Kaks väga olulist ühendust terve võrgustiku mõttes liiguvad läbi tema roosa grupi populaarseima artisti Eminemi juurde ja lilla grupi ühe populaarseima artisti Young Thugi juurde, kes on omakorda enda võrgustikus suurima tsentraalsusega artistid. Seejuures ei tähenda servade tsentraalsus võrgustikus seda, et populaarsed ja tsentraalsuse koha pealt olulised artistid, kes nende servadega ühendatud on, väga palju omavahel koostööd teevad. sest joonte paksus pole väga suur. Samuti on näha, et Drake ja Future (kes kuuluvad erinevatesse gruppidesse) teevad palju lugusid koos, aga neid ühendav serv pole terve võrgustiku seisukohalt väga oluline. Selline gruppide ülene koostöö on siiski pigem erand ja koostöö on pigem tugevam gruppide sees ning tihti teevad grupi populaarseimad artistid nagu Drake, Eminem, Post Malone koostööd grupi vähem populaarsete artistidega, kes omavahel koostööd ei tee.
+
+Samas Punases grupis on näha, et Grupi suurima tsentraalsusega artistist eraldi on väiksem grupp (Don Toliver, NAV, Gunna, Internet Money), kes teevad omavahel palju koostööd ja neil on palju lugusid koos, aga otse Juice WRLDiga seotud on nende grupist ainult Internet Money.
