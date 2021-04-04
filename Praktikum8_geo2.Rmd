@@ -1,0 +1,541 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+## Sissejuhatus
+
+Tänases praktikumis vaatame kaardiobjektidega sooritatavaid operatsioone ning kuidas teha interaktiivseid kaarte `leaflet` paketiga. Kaardiandmed tõmbame OpenStreetMaps-st. Loeme sisse vajalikud paketid ja ühe lisafunktsiooni, mis teeb meie elu OSM andmete kasutamisel lihtsamaks.
+
+```{r}
+library(tidyverse)
+library(sf)
+library(osmdata)
+library(leaflet)
+library(ggrepel)
+library(lwgeom)
+```
+
+```{r}
+clean_osm_data = function(x, retain_named = F){
+  for(i in names(x)){
+    if(str_detect(i, "osm") & !is.null(x[[i]])){
+      if(nrow(x[[i]]) == 0) { next} 
+      if(retain_named){
+        x[[i]] = x[[i]] %>% 
+          filter(!is.na(name))
+      }
+      
+      # res = x[[i]] %>% keep(~ mean(is.na(na_if(.x, ""))) < 0.2) 
+      res = x[[i]] %>% keep(function(.x) if(is.list(.x)){return(T)} else {mean(is.na(na_if(.x, ""))) < 0.2} ) 
+      if(("name" %in% colnames(x[[i]])) & (!("name" %in% colnames(res)))){
+        name = x[[i]] %>% as.data.frame() %>% select(name) 
+        res = res %>% bind_cols(name)
+      }
+      x[[i]] = res
+    }
+  }
+  
+  return(x)
+}
+```
+
+## Tehted geograafiliste andmetega
+
+Esmalt tõmbame alla mõned andmed OSM-st millega me hakkame tegutsema. Plaanis on joonistada kaart Lääne-Virumaa kohta. Tõmbame alla andmed administratiivsete piiride ja teede kohta. Eraldame andmetest ka olulisemad osad välja.
+
+```{r}
+lv_bb = getbb("Lääne-Virumaa")
+
+# Tõmbame andmed alla
+piirid = opq(lv_bb) %>% 
+  add_osm_feature(key = "boundary", value = "administrative") %>% 
+  osmdata_sf() %>% 
+  unname_osmdata_sf() %>% 
+  clean_osm_data()
+
+lv_teed = opq(lv_bb) %>% 
+  add_osm_feature(key = "highway") %>% 
+  osmdata_sf() %>% 
+  unname_osmdata_sf() %>% 
+  clean_osm_data()
+```
+
+```{r}
+# Eraldame alamaandmestikud ehk Lääne-Viru maakonna 6. andmin leveli (maakond) piirid ja nendest ainult Lääne-Viru
+lv_piir = piirid$osm_multipolygons %>% 
+  filter(admin_level == 6) %>% 
+  filter(name == "Lääne-Viru maakond")
+
+#Eraldame 7 admin level (vallad) piirid
+lv_vallad = piirid$osm_multipolygons %>% 
+  filter(admin_level == 7) 
+
+#Eraldame andmin_level 9 ja nendest ainult linnad
+lv_linnad = piirid$osm_multipolygons %>% 
+  filter(admin_level == 9) %>%  
+  filter(str_detect(name, "linn"))
+
+#Eraldame andmin_level 9 ja nendest ainult alevikud
+lv_alevikud = piirid$osm_multipolygons %>% 
+  filter(admin_level == 9) %>%  
+  filter(str_detect(name, "alevik")) 
+
+#Eraldame teed, mida kujutatakse joontega ja ainult valitud highway tüübid
+lv_teed_suured = lv_teed$osm_lines %>% 
+  filter(highway %in% c("trunk", "trunk_link", "primary", "primary_link", "secondary", "secondary_link"))
+```
+
+### Alamhulkade võtmine geograafiliste elementidega
+
+Nagu me nägime, saime me tõesti objektid Lääne-Virumaa teede ja asulate kohta. Kuid saime ka portsu informatsiooni objektide kohta, mis tegelikult jäävad Lääne-Virumaa piiridest välja. Kuna meie eesmärk on joonistada kaart siiski ainult selles maakonnas asuvate objektide kohta, siis tuleks ülejäänud elemendid välja visata. Tihti saab selleks kasutada erinevaid tabeli tunnuseid, kuid üldisem võimalus on kasutada geomeetrilisi objekt endeid, et filtreerimist teostada. Paketis `sf` on selleks terve ports käske, näiteks: `st_within`, `st_contains`, `st_intersects`, `st_touches`, `st_overlaps`, jne
+
+```{r}
+lv_linnad
+
+#vaatame, millised lv_linnad elemendid asuvad lv_piirid elementide sees (TRUE FALSE ja vastab lv_piir ridadele)
+st_within(lv_linnad, lv_piir, sparse = F)
+
+#Võtame ainult need linnad, mi asuvad lv_piit sees ja allpool sama muuga
+lv_linnad = lv_linnad %>% 
+  filter(st_within(x = ., y = lv_piir, sparse = F))
+
+lv_alevikud = lv_alevikud %>% 
+  filter(st_within(x = ., y = lv_piir, sparse = F))
+
+lv_vallad = lv_vallad %>% 
+  filter(st_within(x = ., y = lv_piir, sparse = F))
+
+lv_teed_suured = lv_teed_suured %>% 
+  filter(st_intersects(x = ., y = lv_piir, sparse = F))
+```
+
+Joonistame nüüd kõik elemendid välja
+
+```{r}
+ggplot() +
+  geom_sf(data = lv_piir) +
+  geom_sf(data = lv_vallad) +
+  geom_sf(data = lv_teed_suured) +
+  geom_sf(data = lv_alevikud) +
+  geom_sf(data = lv_linnad) 
+```
+
+Näeme, et oleme tõesti suutnud eraldada suhteliselt edukalt kõik Lääne-Virumaa geograafilised elemendid. Ainult teed lähevad mõnel juhul üle piiri. Selleks et õle jääv jupp ära lõigata kasutame funktsiooni `st_intesection`. Kui enne me filtreerisime ridu, siis see funktsioon modifitseerib vastavat geomeetrilist esitust. Kui me rakendame seda teedele, siis joonte arv jääb samaks kuid me lõikame mõnel joonel lihtsalt jupi ära.
+
+```{r}
+lv_teed_suured = lv_teed_suured %>% 
+  st_intersection(y = lv_piir)
+
+ggplot() +
+  geom_sf(data = lv_piir) +
+  geom_sf(data = lv_vallad) +
+  geom_sf(data = lv_teed_suured) +
+  geom_sf(data = lv_alevikud) +
+  geom_sf(data = lv_linnad) 
+```
+
+Järgmisena näeme, et Lääne-Virumaa maakonna piir sisaldab ka merepiiri. Oma tulevasele kaardile sooviksime siiski panna ainult maapiiri. Valdade tasemel siiski merepiiri pole, seega saame kastuada valdade piire, et tekitada tekitada meie vajadustele sobivam maakonna piir. Me võime võtta valdade kujudest ühendi käsuga `st_union`.
+
+```{r}
+ggplot() +
+  geom_sf(data = lv_piir)
+
+lv_vallad %>% 
+  st_union() %>% 
+  ggplot() +
+    geom_sf()
+
+#võtab ühendi pipe'is osaleva andmestiku elementides, ja mere lõpupiiriga pole ühendit
+lv_piir = lv_vallad %>% 
+  st_union()
+```
+
+Tasub vaadata `st_union` abilehti, et leida veel hulgatehteid.
+
+### Lihtsustamine
+
+Ülalolevate piltide joonistamine võttis üsna kaua aega, sest alla letud geomeetrilised esitused on päris detailsed. Nii pisikeses aknas joonistamiseks võib detailsust vähendada märgatavalt. Selleks kasutame funktsiooni `st_simplify`, millele tuleb parameetriks anda ka `dTolerance` mis ütleb kui suurd võib lihtsustamise viga olla.
+
+```{r}
+lv_piir %>% 
+  st_simplify(dTolerance = 0.001) %>% 
+  ggplot() + 
+    geom_sf()
+
+lv_piir %>% 
+  st_simplify(dTolerance = 0.001) %>% 
+  object.size()
+
+lv_piir %>% object.size()
+```
+
+Rakendame seda nüüd kõigile oma kujunditele.
+```{r}
+lv_piir = lv_piir %>% 
+  st_simplify(dTolerance = 0.001)
+
+lv_vallad = lv_vallad %>% 
+  st_simplify(dTolerance = 0.001)
+
+lv_alevikud = lv_alevikud %>% 
+  st_simplify(dTolerance = 0.001)
+
+lv_linnad = lv_linnad %>% 
+  st_simplify(dTolerance = 0.001)
+
+lv_teed_suured = lv_teed_suured %>% 
+  st_simplify(dTolerance = 0.001)
+
+ggplot() +
+  geom_sf(data = lv_piir) +
+  geom_sf(data = lv_vallad) +
+  geom_sf(data = lv_teed_suured) +
+  geom_sf(fill = "gold", data = lv_alevikud) +
+  geom_sf(fill = "darkred", data = lv_linnad) 
+```
+
+### Keskpunkti leidmine
+
+Mõned alevikud on antud pildi peal isegi suuremad pindalalt kui Rakvere või Tapa ning kipuvad pilti domineerima. Võibolla oleks neid parem esitada punktidena. Selleks võime leida nende kujundite keskpunktid käsuga `st_centroid`.
+
+```{r}
+#leiame alevike raskuskeskme, mis muudab pologyonid selle keskpunktiks
+lv_alevikud_p = lv_alevikud %>% 
+  st_centroid()
+
+ggplot() +
+  geom_sf(data = lv_piir) +
+  geom_sf(data = lv_vallad) +
+  geom_sf(data = lv_teed_suured) +
+  geom_sf(color = "darkred", data = lv_alevikud_p) +
+  geom_sf(fill = "darkred", data = lv_linnad) 
+```
+
+Punktide leidmine on kasulik ka selles mõttes, et ggrepel ei oska sf objektidega toimetada. Punktid aga on võimalik viia formaati, kus me saame eraldada x ja y koordinaadi. Seda saab teha järgnevalt kasutades funktsiooni st_coordinates.
+
+```{r}
+#annab x ja y koordinaadid ploti koordinaatmõõtudes, et neid saaks kasutada siltide jaoks
+lv_alevikud_p = lv_alevikud_p %>% 
+  bind_cols(st_coordinates(.) %>% as.data.frame())
+
+ggplot() +
+  geom_sf(data = lv_piir) +
+  geom_sf(data = lv_vallad) +
+  geom_sf(data = lv_teed_suured) +
+  geom_sf(color = "darkred", data = lv_alevikud_p) +
+  geom_text_repel(aes(x = X, y = Y, label = alt_name), size = 2, color = "darkred", data = lv_alevikud_p) +
+  geom_sf(fill = "darkred", data = lv_linnad) 
+```
+
+### Kauguse järgi filtreerimine
+
+Mõnikord on kasulik andmeid filtreerida ka kauguse järgi teatava objektini. Näiteks antud soovime leida kõik alevikud mida võib pidada Rakvere eeslinnadeks ja näidata neid teise värviga. Defineerime eeslinna kui aleviku, mis asub Rakverest vähem kui 5 kilmeetri kaugusel. Me võime leida sellised linnad automaatselt käsuga `st_is_within_distance`.
+
+```{r}
+r_eeslinn = lv_alevikud_p %>% 
+  filter(
+    st_is_within_distance(
+      x = ., 
+      y = lv_linnad %>% 
+        filter(name == "Rakvere linn"), 
+      dist = 5000, 
+      sparse = F
+    )
+  ) 
+
+
+ggplot() +
+  geom_sf(data = lv_piir) +
+  geom_sf(data = lv_vallad) +
+  geom_sf(data = lv_teed_suured) +
+  geom_sf(color = "pink", data = lv_alevikud_p) +
+  geom_sf(color = "darkred", data = r_eeslinn) +
+  geom_sf(fill = "darkred", data = lv_linnad) 
+  
+```
+
+### Pindala
+
+Kujunditel saab arvutada ka pindala ja pikkust mida võib ära kasutada kui meil on näiteks infot väljastpoolt mida nende numbritega võrrelda. Näiteks põllumaa pindala erinevates valdades või liiklusõnnetuste arv konkreetsel teelõigul. Pindala ja pikkust saab arvutada vastavalt käskudega `st_area` ja `st_length`.
+
+```{r}
+lv_vallad = lv_vallad %>% 
+  mutate(Pindala = st_area(.) %>% as.numeric())
+
+lv_teed_suured = lv_teed_suured %>% 
+  mutate(Pikkus = st_length(.) %>% as.numeric())
+
+ggplot() +
+  geom_sf(data = lv_piir) +
+  geom_sf(aes(fill = Pindala), data = lv_vallad) +
+  geom_sf(data = lv_teed_suured) +
+  geom_sf(color = "pink", data = lv_alevikud_p) +
+  geom_sf(color = "darkred", data = r_eeslinn) +
+  geom_sf(fill = "darkred", data = lv_linnad) 
+
+ggplot() +
+  geom_sf(data = lv_piir) +
+  geom_sf(data = lv_vallad) +
+  geom_sf(aes(color = Pikkus), data = lv_teed_suured) +
+  geom_sf(color = "pink", data = lv_alevikud_p) +
+  geom_sf(color = "darkred", data = r_eeslinn) +
+  geom_sf(fill = "darkred", data = lv_linnad) 
+```
+
+### Lõplik kaart
+
+Paneme nüüd kõik need trikid kokku eelmisel korral õpitud oskustega ja teeme ilusama kaardi.
+
+```{r}
+ggplot() +
+  geom_sf(size = 1.5, data = lv_piir) +
+  geom_sf(fill = "#41ab5d", data = lv_vallad) +
+  geom_sf(color = "gold", data = lv_teed_suured) +
+  geom_sf(color = "#ffffcc", data = lv_alevikud_p) +
+  geom_text_repel(aes(x = X, y = Y, label = alt_name), size = 2, color = "#ffffcc", data = lv_alevikud_p) +
+  geom_sf(fill = "darkred", data = lv_linnad) +
+  geom_sf_text(aes(label = alt_name), color = "#edf8b1", size = 3, data = lv_linnad) +
+  theme_void()
+
+```
+
+#### Ülesanded
+
+Tõmbame andmed Rakvere linna kohta.
+
+```{r}
+r_bb = getbb("Rakvere")
+
+hooned = opq(r_bb) %>% 
+  add_osm_feature(key = "building") %>% 
+  osmdata_sf() %>% 
+  unname_osmdata_sf() %>% 
+  clean_osm_data()
+
+asutused = opq(r_bb) %>% 
+  add_osm_feature(key = "amenity") %>% 
+  osmdata_sf() %>% 
+  unname_osmdata_sf() %>% 
+  clean_osm_data(retain_named = T)
+
+teed = opq(r_bb) %>% 
+  add_osm_feature(key = "highway") %>% 
+  osmdata_sf() %>% 
+  unname_osmdata_sf()%>% 
+  clean_osm_data()
+
+piirid = opq(r_bb) %>% 
+  add_osm_feature(key = "boundary", value = "administrative") %>% 
+  osmdata_sf() %>% 
+  unname_osmdata_sf() %>% 
+  clean_osm_data()
+
+r_asutused = asutused$osm_points %>% bind_rows(st_centroid(asutused$osm_polygons))
+r_hooned = hooned$osm_polygons
+r_teed = teed$osm_lines %>% 
+  filter(!(highway %in% c("steps", "path", "footway", "cycleway", "service", "track", "pedestrian", "living_street")))
+r_piir = piirid$osm_multipolygons %>% 
+  filter(admin_level == 7) %>% 
+  filter(name == "Rakvere linn")
+r_bussijaam = r_asutused %>% 
+  filter(name == "Rakvere bussijaam")
+```
+
+-   Joonista Rakvere kaart kasutades andmestikke: r_asutused, r_hooned, r_teed, r_piir ja r_bussijaam. Seal võiks peal olla
+
+    -   kõik teed Rakvere piiride sees
+
+    -   kõik Rakvere piirides olevad majad
+
+    -   Rakvere piir
+
+    -   kõik kohvikud, sealhulgas bussijaamast 500 m kaugusele jäävad võiks olla nimega välja toodud
+    
+```{r}
+
+r_teed = r_teed %>%
+  st_intersection(r_piir)
+
+r_hooned = r_hooned %>% 
+  filter(st_within(x=., y=r_piir, sparse =F))
+
+r_kohvikud = r_asutused %>% 
+  filter(amenity == "cafe")
+
+r_kohvikud = r_kohvikud %>% 
+  bind_cols(st_coordinates(.) %>% as.data.frame())
+
+r_kohvikud_2 = r_kohvikud %>% 
+  filter(
+    st_is_within_distance(
+      x = ., 
+      y = r_bussijaam, 
+      dist = 500, 
+      sparse = F
+    )
+  ) 
+
+ggplot()+
+  geom_sf(size = 1.5, data = r_piir)+
+  geom_sf(color = "gray15", data = r_teed)+
+  geom_sf(color = "pink", data = r_hooned)+
+  geom_sf(color = "blue", data = r_bussijaam)+
+  geom_sf(color = "red", data = r_kohvikud)+
+  geom_text_repel(aes(x = X, y = Y, label = name), size = 2, color = "black", data = r_kohvikud_2) +
+  theme_void()
+```
+
+
+## Interaktiivsed kaardid
+
+Interaktiivseid kaarte saame teha paketiga `leaflet`. See pakendab lihtsalt samanimelise javascript teegi. Sisuliselt saab nii implementeerida Google maps tüüpi rakendusi, kus me saame kaardile sisse ja välja zoomida ning kaardile markereid ja kujundeid lisada.
+
+Sellised kaardid töötavad tõmmates vastavalt vajadusele alla kaardilehti vastava asukoha ja zoom tasemele. Esmast kaarti on üles seada väga lihtne, kasutades funktsioone `leaflet` kaardi loomiseks, `addTiles` kaardilehtede lisamiseks ja `setView` algse asukoha ja zoom taseme määramiseks.
+
+```{r}
+leaflet()  
+
+
+leaflet() %>% 
+  addTiles() 
+
+
+leaflet() %>% 
+  addTiles() %>% 
+  setView(lng = 25.5, lat = 58.5, zoom = 6)
+```
+
+Kasutada saab erinevaid aluskaarte valides neid käsuga addProviderTiles. Kõiki võimalike variante on võimalik vaadata lingil <http://leaflet-extras.github.io/leaflet-providers/preview/>.
+
+```{r}
+leaflet() %>% 
+  #addProviderTiles(providers$Stamen.Toner) %>%
+  #addProviderTiles(providers$CartoDB.Positron) %>%
+  #addProviderTiles(providers$Esri.NatGeoWorldMap) %>% 
+  setView(lng = 25.5, lat = 58.5, zoom = 6) 
+```
+
+### Elementide lisamine kaardile
+
+Leafleti eelis staatiliste piltide ees on, et sellele kaardile saab lisada interaktiivseid markereid. Markerid võivad olla suhteliselt suvalisel kujul, kuid väga hästi töötavad ka `sf` formaadis andmed. Markeri puhul saab defineerida, mis juhtub, kui sa hiirega markeri kohal oled (`label`) ja mida kirjutatakse avanevasse aknasse, kui sa sellele markeril klikid (`popup`). Mõelmal juhul võib lisada ka html koodi, et teksti vormindada.
+
+```{r}
+leaflet(lv_alevikud_p) %>% 
+  addTiles() %>% 
+  addMarkers(label = ~name, popup = ~name)
+
+leaflet(lv_alevikud_p) %>% 
+  addTiles() %>% 
+  addMarkers(label = ~alt_name, popup = ~ str_c("Alevik nimega <br>", "<b>", alt_name, "</b>"))
+
+leaflet(lv_alevikud_p) %>% 
+  addTiles() %>% 
+  addMarkers(label = ~name, popup = ~name, )
+```
+
+Markerite kuju võib muuta kasutades näiteks ümmargusi markereid käsuga addCircleMarkers.
+
+```{r}
+leaflet(lv_alevikud_p) %>% 
+  addTiles() %>% 
+  addCircleMarkers(label = ~name, popup = ~name)
+
+leaflet(lv_alevikud_p) %>% 
+  addTiles() %>% 
+  addCircleMarkers(label = ~name, popup = ~name, color = "red", radius = 5, fillOpacity = 1)
+```
+
+Saab näidata ka lihtsalt ringe, jooni ja polügone.
+
+```{r}
+leaflet(lv_alevikud_p) %>% 
+  addTiles() %>% 
+  addCircles(label = ~name, popup = ~name, radius = 3000)
+
+leaflet(lv_teed_suured) %>% 
+  addTiles() %>% 
+  addPolylines(label = ~name, popup = ~name)
+
+
+leaflet(lv_vallad) %>% 
+  addTiles() %>% 
+  addPolygons(label = ~name, popup = ~name, fillColor = "green")
+```
+
+Kujundeid saab ka värvida andmete põhjal, kuid see töötab natuke teisiti kui ggplotis. Sisuliselt tuleb ette anda skaleeritud värvide vektor, kuid õnneks on olemas eraldi funktsioonid paleti tekitamsieks: colorNumeric, colorBin, colorQuantile ja colorFactor. Lisada saab ka legendi käsuga addLegend.
+
+```{r}
+pal = colorFactor(c("red", "green", "blue"), lv_vallad$EHAK.code)
+
+leaflet(lv_vallad) %>% 
+  addTiles() %>% 
+  addPolygons(label = ~ name, fillColor = ~ pal(lv_vallad$EHAK.code), fillOpacity = 1, opacity = 1, weight = 1)
+
+pal = colorFactor("YlGnBu", lv_vallad$EHAK.code)
+
+leaflet(lv_vallad) %>% 
+  addTiles() %>% 
+  addPolygons(label = ~ name, fillColor = ~ pal(lv_vallad$EHAK.code), fillOpacity = 1, opacity = 1, weight = 1)
+
+
+pal = colorFactor("YlGnBu", lv_vallad$EHAK.code)
+
+leaflet(lv_vallad) %>% 
+  #addTiles() %>% 
+  addPolygons(label = ~ name, fillColor = ~ pal(EHAK.code), fillOpacity = 1, opacity = 1, weight = 1) %>% 
+  addLegend("bottomright", pal = pal, values = ~EHAK.code,
+    title = "EHAK",
+    opacity = 1
+  )
+```
+
+Me saame kontrollida kuidas muutuvad kaardi elemendid kui me neile peale läheme parameetriga highlight.
+
+```{r}
+pal = colorFactor("YlGnBu", lv_vallad$EHAK.code)
+
+leaflet(lv_vallad) %>% 
+  addTiles() %>% 
+  addPolygons(
+    label = ~ name, 
+    fillColor = ~ pal(lv_vallad$EHAK.code), 
+    fillOpacity = 1, 
+    opacity = 1, 
+    weight = 1, 
+    highlight = highlightOptions(
+      weight = 5,
+      color = "white",
+      bringToFront = TRUE
+    )
+  )
+```
+
+#### Ülesanne
+
+-   Tee interaktiivne kaart Rakvere linna asutustega. Erinevat tüüpi asutused võiks olla erinevat värvi markeriga ning asutuse tüüpide kohta võiks olla legend. Peale klikkides võiks olla näha asutuse nimi.
+
+```{r}
+pal = colorFactor("YlGnBu", r_asutused$amenity)
+
+leaflet(r_asutused) %>% 
+  addTiles() %>% 
+  addCircleMarkers(
+    label = ~ name, 
+    fillColor = ~ pal(r_asutused$amenity), 
+    fillOpacity = 1, 
+    opacity = 1, 
+    radius = 3) %>% 
+  addLegend("bottomright", pal = pal, values = ~amenity,
+    title = "Amenity",
+    opacity = 1)
+```
+
+
+## Koduülesanne (staatiline kaart)
+
+Teil tuleb noorem sugulane Tartusse ülikooli ja pole siin linnas kunagi käinud. Tehke talle üks väljaprinditav kaart, kus on teie arvates olulisemad asjad välja toodud (näiteks, õppehooned, ühika ümbruse poed, parimad lõbustusasutused, kõige olulisemad tänavad, ...). Mõned asjad võiks kindlasti olla näidatud ka nimega. Kaart võiks olla visuaalselt puhas ja kena välja näha, nii et nimed oleks loetavad ja ei kattu, ei ole mingeid suvalisi teejuppe mis kuhugi ei vii. Kindlasti võiks peal olla ka jõgi.
+
+## Koduülesanne (interaktiivne kaart)
+
+Tehke samale sugulasele nüüd interaktiivne kaart. Kuna interaktiivne lahendus võimaldab sisse ja välja zoomida ning vajadusel täpsemat infot küsida, siis on võimalik panna peale rohkem infot. Lõpptulemusena võiks tekkida kaart millelt on võimalik leida kõik eluks vajalik. Sellele kaardil võiks olla vähemalt kolm kihti ja legend. Kindlasti tasub uurida ka erinevaid interaktiivseid võimalusi millest praksis ei jõudnud rääkida <https://rstudio.github.io/leaflet/>.
