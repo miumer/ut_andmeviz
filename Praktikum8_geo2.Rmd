@@ -96,7 +96,7 @@ lv_linnad
 #vaatame, millised lv_linnad elemendid asuvad lv_piirid elementide sees (TRUE FALSE ja vastab lv_piir ridadele)
 st_within(lv_linnad, lv_piir, sparse = F)
 
-#Võtame ainult need linnad, mi asuvad lv_piit sees ja allpool sama muuga
+#Võtame ainult need linnad, mi asuvad lv_piir sees ja allpool sama muuga
 lv_linnad = lv_linnad %>% 
   filter(st_within(x = ., y = lv_piir, sparse = F))
 
@@ -113,12 +113,12 @@ lv_teed_suured = lv_teed_suured %>%
 Joonistame nüüd kõik elemendid välja
 
 ```{r}
-ggplot() +
-  geom_sf(data = lv_piir) +
-  geom_sf(data = lv_vallad) +
-  geom_sf(data = lv_teed_suured) +
-  geom_sf(data = lv_alevikud) +
-  geom_sf(data = lv_linnad) 
+        ggplot() +
+          geom_sf(data = lv_piir) +
+          geom_sf(data = lv_vallad) +
+          geom_sf(data = lv_teed_suured) +
+          geom_sf(data = lv_alevikud) +
+          geom_sf(data = lv_linnad) 
 ```
 
 Näeme, et oleme tõesti suutnud eraldada suhteliselt edukalt kõik Lääne-Virumaa geograafilised elemendid. Ainult teed lähevad mõnel juhul üle piiri. Selleks et õle jääv jupp ära lõigata kasutame funktsiooni `st_intesection`. Kui enne me filtreerisime ridu, siis see funktsioon modifitseerib vastavat geomeetrilist esitust. Kui me rakendame seda teedele, siis joonte arv jääb samaks kuid me lõikame mõnel joonel lihtsalt jupi ära.
@@ -217,7 +217,7 @@ Punktide leidmine on kasulik ka selles mõttes, et ggrepel ei oska sf objektideg
 ```{r}
 #annab x ja y koordinaadid ploti koordinaatmõõtudes, et neid saaks kasutada siltide jaoks
 lv_alevikud_p = lv_alevikud_p %>% 
-  bind_cols(st_coordinates(.) %>% as.data.frame())
+      bind_cols(st_coordinates(.) %>% as.data.frame())
 
 ggplot() +
   geom_sf(data = lv_piir) +
@@ -354,11 +354,11 @@ r_bussijaam = r_asutused %>%
     
 ```{r}
 
-r_teed = r_teed %>%
-  st_intersection(r_piir)
-
-r_hooned = r_hooned %>% 
-  filter(st_within(x=., y=r_piir, sparse =F))
+  r_teed = r_teed %>%
+    st_intersection(r_piir)
+  
+  r_hooned = r_hooned %>% 
+    filter(st_within(x=., y=r_piir, sparse =F))
 
 r_kohvikud = r_asutused %>% 
   filter(amenity == "cafe")
