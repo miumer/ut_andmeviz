@@ -22,6 +22,7 @@ library(osmdata)
 library(leaflet)
 library(ggrepel)
 library(lwgeom)
+library(RColorBrewer)
 ```
 
 ```{r}
@@ -48,12 +49,12 @@ clean_osm_data = function(x, retain_named = F){
 }
 ```
 
-```{r}
+```{r, fig.height=15, fig.width=15}
 t_bb = getbb("Tartu kesklinn")
 
 teed = opq(t_bb) %>% 
   add_osm_feature(key = "highway") %>% 
-  osmdata_sf() %>% 
+  osmdata_sf(encoding = UTF-16) %>% 
   unname_osmdata_sf()
 
 vesi = opq(t_bb) %>% 
@@ -96,23 +97,31 @@ t_asutushooned_p = t_asutushooned %>%
 
 t_asutushooned[ ,"Asutuse tüüp"] <- NA
 
-t_asutushooned %>% 
-  mutate(`Asutuse tüüp`=replace(`Asutuse tüüp`, addr.street == "Ujula" |
+t_teed2 = t_teed %>% 
+  bind_cols(st_coordinates(.) %>% as.data.frame() %>% distinct(L1, .keep_all = TRUE)) %>% 
+  group_by(name) %>%
+  filter(row_number() %in% c(1,5)) 
+
+t_asutushooned_p <- t_asutushooned_p %>% 
+  mutate(across(c(name.x, name.y), ~iconv(.,from="UTF-8", to="UTF-8")))
+
+tartu_kaart <- ggplot() +
+  geom_sf(data = t_teed, color = "gray30") +
+  geom_sf(data = t_asutushooned, fill = "gray75", color = "gray70")+
+  geom_sf(data = t_asutushooned %>% filter(addr.street == "Ujula" |
                                              addr.street == "Riia" & addr.housenumber == "1" |
                                              addr.street == "Raatuse" & addr.housenumber == 20|
                                              name.x == "Coop Kivi Konsum"|
                                              amenity == "marketplace"|
                                              name.x == "Grossi Toidukaubad"|
-                                             addr.street == "Lembitu" & addr.housenumber == 2, "Toidupood"))
-
-unique(t_asutushooned$`Asutuse tü`)
-
-stf_f$clust4g[stf_f$stflife <= 5 & stf_f$stfeco < 5] <- 1
-
-ggplot() +
-  geom_sf(data = t_teed, color = "grey80") +
-  geom_sf(data = t_asutushooned, fill = "gray60")+
-  geom_sf(data = hooned$osm_polygons %>% filter(building == "dormitory"), fill = "red")+
+                                             addr.street == "Lembitu" & addr.housenumber == 2), aes(fill = "Toidukaubad"), show.legend = "multipolygon")+
+  geom_sf(data = t_asutushooned %>% filter(name.x == "Tasku"|
+                                             name.x == "Zeppelin"|
+                                             name.x == "Kvartal"), aes(fill = "Kaubanduskeskus"), show.legend = "multipolygon")+
+  geom_sf(data =   t_asutushooned %>% filter(name.x %in% c("AHHAA Teaduskeskus", "Aura veekeskus",  "Mänguasjamuuseum")), aes(fill = "Vabaaeg"), show.legend = "multipolygon")+
+  geom_sf(data = t_asutushooned %>% filter(amenity %in% c("pub", "bar", "cafe", "restaurant", "fast_food") & !(name.x %in% c("Kvartal", "Tartu linnaraamatukogu", "Üliõpilaselamu Pepleri 14", "Tartu Kaubamaja", "Tasku"))), aes(fill = "Söök ja jook"), show.legend = "multipolygon")+
+  geom_sf(data = hooned$osm_polygons %>% filter(building == "dormitory"), aes(fill = "Ühikad"), show.legend = "multipolygon")+
+  geom_sf(data = t_asutushooned %>% filter(amenity == "library"), aes(fill = "Raamatukogu"), show.legend = "multipolygon")+
   geom_sf(data = t_asutushooned %>% filter(name.y %in% c(
     "Johan Skytte poliitikauuringute instituut", 
     "Ühiskonnateaduste instituut",
@@ -129,44 +138,130 @@ ggplot() +
     "Matemaatika ja statistika instituut",
     "Majandusteaduskond",
     "kultuuriteaduste instituut"
-    )), fill = "gold") + 
-  geom_sf(data = t_asutushooned %>% filter(addr.street == "Ujula" |
+    )), aes(fill = "Ülikoolihooned"), show.legend = "multipolygon") +
+  scale_fill_manual(values= c("#A65628", "#984EA3", "#FF7F00", "#FFFF33", "#E41A1C", "#F781BF", "#E7298A"))+
+  geom_sf(fill = "#0077be", data = vesi$osm_multipolygons) +
+  geom_sf(fill = "#138510", data = park$osm_multipolygons)+
+  geom_sf(fill = "#138510", data = park$osm_polygons)+
+  geom_text_repel(aes(x = X, y = Y, label = name), size = 2.5, color = "black", data = t_teed2 %>% filter(name %in% c("Raatuse", "Vabaduse pst", "Veski", "Raudtee", "Turu", "Narva mnt", "Riia")))+
+  geom_label_repel(aes(x = X, y = Y, label = name.x), fill = "yellow", nudge_x = -0.002, size = 1.8, data = t_asutushooned_p %>% filter(addr.street == "Ujula" |
                                              addr.street == "Riia" & addr.housenumber == "1" |
                                              addr.street == "Raatuse" & addr.housenumber == 20|
                                              name.x == "Coop Kivi Konsum"|
                                              amenity == "marketplace"|
                                              name.x == "Grossi Toidukaubad"|
-                                             addr.street == "Lembitu" & addr.housenumber == 2), fill = "purple")+
-  #geom_sf(data = t_asutushooned %>% filter(addr.street == "Riia" & addr.housenumber == "1"), fill = "purple")+ #Kaubamaja
-  #geom_sf(data = t_asutushooned %>% filter(addr.street == "Raatuse" & addr.housenumber == 20), fill = "purple")+ #Selver
-  #geom_sf(data = t_asutushooned %>% filter(name.x == "Coop Kivi Konsum"), fill = "purple")+
-  #geom_sf(data = t_asutushooned %>% filter(amenity == "marketplace"), fill = "purple")+
-  geom_sf(data = t_asutushooned %>% filter(name.x == "Tasku"), fill = "purple")+
-  #geom_sf(data = t_asutushooned %>% filter(name.x == "Grossi Toidukaubad"), fill = "purple")+
-  geom_sf(data = t_asutushooned %>% filter(name.x == "Zeppelin"), fill = "purple")+
-  geom_sf(data = t_asutushooned %>% filter(name.x == "Kvartal"), fill = "purple")+
-  #geom_sf(data = t_asutushooned %>% filter(addr.street == "Lembitu", addr.housenumber == 2), fill = "purple")+ #Kivi konsum
-  geom_sf(data = t_asutushooned %>% filter(amenity %in% c("theatre", "cinema", "concert_hall")), fill = "pink")+ #kinod/teatrid
-  geom_sf(data =   t_asutushooned %>% filter(name.x %in% c("AHHAA Teaduskeskus", "Aura veekeskus",  "Mänguasjamuuseum")), fill = "pink")+
-  geom_sf(data = t_asutushooned %>% filter(amenity %in% c("pub", "bar", "cafe", "restaurant", "fast_food") & !(name.x %in% c("Kvartal", "Tartu linnaraamatukogu", "Üliõpilaselamu Pepleri 14", "Tartu Kaubamaja", "Tasku"))), fill = "#654321")+
-  geom_sf(data = t_asutushooned %>% filter(amenity == "library"), fill = "orange")+
-  geom_sf(data = asutused$osm_points %>% filter(amenity == "post_office"), fill = "turquoise")+
-  geom_sf(fill = "#0077be", data = vesi$osm_multipolygons) +
-  geom_sf(fill = "#138510", data = park$osm_multipolygons)+
-  geom_sf(fill = "#138510", data = park$osm_polygons)+
+                                             addr.street == "Lembitu" & addr.housenumber == 2) %>% 
+                     distinct(osm_id.x, .keep_all = TRUE) %>% filter(!is.na(name.x)))+
+  geom_label_repel(aes(x = X, y = Y, label = name.x), fill = "#A65628", size = 1.8, data = t_asutushooned_p %>% filter(name.x == "Tasku"|
+                                             name.x == "Zeppelin"|
+                                             name.x == "Kvartal") %>% 
+                     distinct(name.x, .keep_all = TRUE))+
+  geom_label_repel(aes(x = X, y = Y, label = name.x), fill = "#E7298A", nudge_y = 0.0005, size = 1.8, data = t_asutushooned_p %>% filter(name.x %in% c("AHHAA Teaduskeskus", "Aura veekeskus",  "Mänguasjamuuseum")))+
+  geom_label_repel(aes(x = X, y = Y, label = name.x), fill = "#984EA3", size = 1.8, data = t_asutushooned_p %>% filter(amenity == "library"), nudge_y = 0.0008)+
+  geom_label_repel(aes(x = X, y = Y, label = name.y), nudge_y = 0.0008, nudge_x = -0.002, fill = "#F781BF", size = 1.8, data = t_asutushooned_p %>% filter(name.y %in% c(
+    "Johan Skytte poliitikauuringute instituut", 
+    "Ühiskonnateaduste instituut",
+    "Genoomika instituut",
+    "Tartu ülikooli maailma keelte ja kultuuride kolledž",
+    "Filosoofia ja semiootika instituut",
+    "Eesti ja üldkeeleteaduse instituut",
+    "Ajaloo ja arheoloogia instituut",
+    "Molekulaar- ja rakubioloogia instituut",
+    "Hambaarstiteaduse instituut",
+    "Usuteaduskond",
+    "Ökoloogia ja maateaduste instituut",
+    "Arvutiteaduse instituut",
+    "Matemaatika ja statistika instituut",
+    "Majandusteaduskond",
+    "kultuuriteaduste instituut"
+    )))+
+  geom_label_repel(aes(x = X, y = Y, label = name.x), nudge_y = 0.001, nudge_x = 0.002, fill = "#E41A1C", size = 1.8, data = t_asutushooned_p %>% filter(building == "dormitory"))+
   xlim(t_bb[1, ]) + 
   ylim(t_bb[2, ])+
   theme_void()+
-  theme(plot.background = element_rect(fill = "grey50"))
+  theme(plot.background = element_rect(fill = "grey80"))+
+  guides(fill=guide_legend(title="Asutuse tüüp"))
+
+ggsave("tartu_kaart.png", width = 274, height = 415, units = c("mm"), dpi = 320)
 ```
 
 ## Ülesanne 2
 
 Tehke samale sugulasele nüüd interaktiivne kaart. Kuna interaktiivne lahendus võimaldab sisse ja välja zoomida ning vajadusel täpsemat infot küsida, siis on võimalik panna peale rohkem infot. Lõpptulemusena võiks tekkida kaart millelt on võimalik leida kõik eluks vajalik. Sellele kaardil võiks olla vähemalt kolm kihti ja legend. Kindlasti tasub uurida ka erinevaid interaktiivseid võimalusi millest praksis ei jõudnud rääkida [<https://rstudio.github.io/leaflet/>](https://rstudio.github.io/leaflet/){.uri}.
 
+```{r}
+leaflet(t_asutushooned_p) %>% 
+  addTiles() %>%
+  addCircleMarkers(label = ~name.x, popup = ~name.x)
+```
+
+
 ## Ülesanne 3
 
 Kasutades Spotify populaarsete lugude andmestikku (Koduülesandest 5). Tehke nüüd interaktiivne visualisatsioon samast võrgustikust. Sellel shiny rakendusel peaks olema vähemalt 3 erinevat kontrolli, millega parameetreid muuta. Tulemuseks saadav rakendus peaks olema ilusti vormistatud, kontrollid olema sisukad, pilt selge ning kergesti loetav.
+
+```{r}
+library(tidyverse)
+library(tidygraph)
+library(ggraph)
+library(igraph)
+
+load("spotify_foreign.RData", verbose = T)
+
+edges_foreign = edges_foreign %>%
+  rename(from = ArtistName1, to = ArtistName2)
+
+g = tbl_graph(nodes = nodes_foreign, edges = edges_foreign, node_key = "ArtistName", directed = F)
+
+net <- g %>%
+    activate(edges) %>% 
+    mutate(`Edge Centrality` = centrality_edge_betweenness()) %>% 
+    activate(nodes) %>% 
+    filter(ArtistGenre == "hip-hop") %>% 
+    mutate(CC = group_components()) %>% 
+    filter(CC==1) %>% 
+    filter(!node_is_isolated()) %>%
+    mutate(`Louvain Grouping` = as.factor(group_louvain())) %>%
+    mutate(`Node Centrality Betweenness` = centrality_betweenness(weights = nTracks, directed = FALSE)) %>%
+    ggraph(layout = "kk") +
+    geom_edge_link(aes(width = nTracks, color = `Edge Centrality`))+
+    geom_node_point(aes(fill = `Louvain Grouping`, size = `Node Centrality Betweenness`, alpha = ArtistPopularity), shape = 21)+
+    geom_node_label(aes(label = ArtistName, fill = `Louvain Grouping`, alpha = ArtistPopularity), repel = T, color = "white", show.legend = c(alpha = F))+
+    scale_edge_color_gradientn(colors = c(low = "white", mid = "red", high = "blue"))+
+    scale_fill_brewer(type="qual", palette = "Set1")+
+    theme(panel.background = element_rect(fill = "black"))+
+    theme(plot.background = element_rect(fill = "lightgray", colour = "gray30", size = 2))+
+    theme(legend.background = element_rect(fill= "black", colour = "#D100FF", linetype = "dashed"),
+          legend.box = "horizontal", legend.text = element_text(color = "white", size = 12), 
+          legend.title = element_text(color="white", size = 13),
+          legend.key=element_rect(fill = "#FEF8C0"),
+          legend.position = c(0.45,0.97), legend.justification = c(1, 1))+
+    theme(axis.text.x = element_blank(),
+            axis.text.y = element_blank())+
+      theme(axis.title.x = element_blank(),
+            axis.title.y = element_blank())+
+    scale_size(range = c(3,8))+
+    scale_edge_width(range = c(1, 3))+
+    scale_alpha(range= c(0.3,1))+
+    guides(fill=guide_legend(ncol=3), alpha = guide_legend(ncol=2, title = "Artist Popularity"), size = guide_legend(ncol=3))
+```
+
+```{r}
+library(shiny)
+
+# Define UI for app that draws a histogram ----
+ui = dashboardPage(
+dashboardSidebar(width = 350
+)
+)
+
+
+server = function(input, output) {
+}
+
+shinyApp(ui = ui, server = server)
+```
+
 
 ## Ülesanne 4
 
@@ -176,10 +271,133 @@ Andmestikus `occupations.RData` on info erinevate inimeste, sugude, vanuste, pal
 
 Andmestikus `birth_year.RData` on aasta päevade kaupa toodud ära keskmine sündide arv USAs. Proovige ÜHE graafikuga näidata selles andmestikus midagi huvitavat. Vormistage graafik nii, et see iseseisvalt annaks edasi sõnumi. Järgige selle töö käigus SWD protsessi ja lisaks pildile kirjutage sammude 2-5 kohta mida te iga sammu puhul konkreetselt tegite.
 
+Samm 2: Otsusasin kasutada joongraafikut, kuna see on hea aegridade kujutamiseks. 
+Samm 3: theme_swd eemdalas graafiku taustalt ebavajalikud jooned ja värvid. eemaldasin telgedelt üleliigsed lõpud, ebavajalik tekst on hall. Kevade ja sügise jooned tegin ka halliks, kuna lugu on talve ja suve erinevusest.
+Samm 4: Fookuseks on suvekuude ja talvekuude erinevused sündides
+Samm 5: Kuna tahtsin just rõhutada kahte aastaaega, siis kasutasin värve vastavalt aastaajale. Talvel külm sinine, suvel soe punane. Et oleks kiirelt arusaadav, et värvid kujutavad aastaaegu lisasin piiritlevad sildid sama värvi kirjadega. Et rõhutada suve ja talve erinevust tõin lisaks välja kõrgeimate sündide arvudega päevad ja madalaimate süsndide arvudega päevad. Oleksin võinud ka kuude keskmiseid kasutada, aga arvan, et päevade kaupa näitamine annab rohkem vahetust pildile ja lisaks sain nii huvitavat informatsioni lisada kõrgeimate ja madalaimate päevade kohta.
+```{r}
+library(tidyverse)
+library(lemon)
+library(scales)
+library(ggrepel)
+library(circlize)
+
+load("births_year.RData", verbose = T)
+
+GRAY1 = "#231F20"
+GRAY2 = "#414040"
+GRAY3 = "#555655"
+GRAY4 = "#646369"
+GRAY5 = "#76787B"
+GRAY6 = "#828282"
+GRAY7 = "#929497"
+GRAY8 = "#A6A6A5"
+GRAY9 = "#BFBEBE"
+BLUE1 = "#174A7E"
+BLUE2 = "#4A81BF"
+BLUE3 = "#94B2D7"
+BLUE4 = "#94AFC5"
+BLUE5 = "#22435e"
+BLUE6 = "#95B3D7"
+RED1 = "#C3514E"
+RED2 = "#E6BAB7"
+RED3 = "#800000"
+GREEN1 = "#0C8040"
+GREEN2 = "#9ABB59"
+GREEN3 = "#31859C"
+GREEN4 = "#4BACC6"
+GREEN5 = "#93CDDD"
+ORANGE1 = "#F79747"
+ORANGE2 = "#FFA65C"
+ORANGE3 = "#FAC090"
+
+theme_swd <- function() {
+  theme_minimal(base_size = 11) +
+    theme(
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      axis.line = element_line(size = .13, color = GRAY9),
+      axis.text = element_text(color = GRAY7),
+      axis.ticks.x = element_line(size = 0.5, color = GRAY9),
+      axis.ticks.y = element_line(size = 0.5, color = GRAY9),
+      axis.title = element_text(color = GRAY3),
+      axis.title.y = element_text(hjust = 1, margin = margin(0, 6, 0, 15, "pt")),
+      axis.title.x = element_text(hjust = 0, margin = margin(6, 0, 15, 0, "pt")),
+      plot.subtitle = element_text(color = GRAY4, size= 11),
+      plot.title = element_text(color = GRAY4, size= 15),
+      plot.title.position = "plot", # This aligns the plot title to the very left edge
+      plot.caption = element_text(hjust = 0, color = GRAY6),
+      plot.caption.position = "plot",
+      plot.margin = margin(.5,.5,.5,.5,"cm"),
+      strip.text = element_text(color = GRAY7)) 
+}
+
+births_year2 <- births_year %>% 
+  mutate(Aastaaeg = case_when(
+    DayOfYear > 81 & DayOfYear < 154 ~ "Kevad",
+    DayOfYear > 153 & DayOfYear < 266 ~ "Suvi",
+    DayOfYear > 265 & DayOfYear < 356 ~ "Sügis",
+    TRUE ~ "Talv"
+  )) %>% 
+  mutate(line_color = case_when(
+    Aastaaeg == "Talv" ~ BLUE1,
+    Aastaaeg == "Kevad" ~ GRAY9,
+    Aastaaeg == "Suvi" ~ RED1,
+    TRUE ~ GRAY9
+  )) %>%
+  mutate(Month = factor(Month, labels=c("Detsember", "Jaanuar", "Veebruar", "Märts", "Aprill", "Mai", "Juuni", "Juuli", "August", "September", "Oktoober", "November"))) %>% 
+  mutate(DayofYear2 = factor(DayOfYear)) %>% 
+  ggplot(aes(x=`DayofYear2`, y=AverageBirths, group = Month, color = line_color)) +
+  geom_path(aes(group = 1), size = 1.2) +
+  scale_x_discrete(breaks=c(1, 32, 61, 91, 122, 153, 183, 214, 245, 275, 306, 336, 365),
+        labels=c("jaan", "veebr", "märts", "apr", "mai", "juuni", "Juuli", "aug", "sept", "okt", "nov", "dets", ""))+
+  ylim(c(6000, 14000)) +
+  coord_capped_cart(left = 'both', bottom = "both")+
+  scale_color_identity() +
+  geom_point(data = ~ .x %>% slice_max(AverageBirths, n = 2), size = 2) +
+  geom_text_repel(aes(label = paste(Month, DayOfMonth)),
+                  data = ~ .x %>%  slice_max(AverageBirths, n = 2))+
+  geom_point(data = ~ .x %>% slice_min(AverageBirths, n = 3), size = 2) +
+  geom_text_repel(aes(label = paste(Month, DayOfMonth)),  nudge_y = 0.5, nudge_x = 0.15, min.segment.length = 2,
+                  data = ~ .x %>% slice_min(AverageBirths, n = 3))+ 
+  theme_swd()+
+   geom_segment(aes(x = 1, xend = 81, 
+                   y =12100, yend = 12100),
+               colour = BLUE1)+
+  geom_segment(aes(x = 81, xend = 81, 
+                   y = 12000, yend = 12100),
+               colour = BLUE1) +
+  geom_text(x = 40.5,
+            y = 12350, show.legend = FALSE,
+            label = "Talv", 
+            colour = BLUE1, size = 5)+
+  geom_segment(aes(x = 155, xend = 265, 
+                   y =13000, yend = 13000),
+               colour = RED1)+
+  geom_segment(aes(x = 155, xend = 155, 
+                   y = 12950, yend = 13000),
+               colour = RED1) +
+  geom_segment(aes(x = 265, xend = 265, 
+                   y = 12950, yend = 13000),
+               colour = RED1) +
+  geom_text(x = 155+((265-155)/2),
+            y = 13250, show.legend = FALSE,
+            label = "Suvi", 
+            colour = RED1, size = 5)+
+  geom_segment(aes(x = 356, xend = 365, 
+                   y =12750, yend = 12750,
+                   color = BLUE1))+
+  geom_segment(aes(x = 356, xend = 356, 
+                   y = 12650, yend = 12750,
+               color = BLUE1)) +
+  ggtitle("Keskmine sündide arv", subtitle = "Suvel sünnib rohkem lapsi kui talvel")+
+  xlab("Päevad")+
+  ylab("Keskmine sündide arv")
+
+ggsave("aasta_sunnid.png")
+```
+
+
 ## Ülesanne 6
 
 ![](images/Ylesanne6.png)
-
-## Ülesanne 7
-
-![](images/Ylesanne7.png)
